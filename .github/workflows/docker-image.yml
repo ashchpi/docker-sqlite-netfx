@@ -39,4 +39,4 @@ jobs:
         context: .
         platforms: linux/amd64,linux/arm64
         push: true
-        tags: AlexeiScherbakov/aspnet-sqlite-netfx:latest
+        tags: alexeischerbakov/aspnet-sqlite-netfx:latest
