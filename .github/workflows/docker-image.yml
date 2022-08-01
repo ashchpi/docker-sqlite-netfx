@@ -43,6 +43,6 @@ jobs:
         file: ./Dockerfile 
         platforms: linux/amd64,linux/arm64
         push: true
-        tags: |
-          ghcr.io/alexeishcherbakov/docker-sqlite-netfx/aspnet:latest
-          ghcr.io/alexeishcherbakov/docker-sqlite-netfx/aspnet:6.116
+#        tags: |
+#          ghcr.io/alexeishcherbakov/docker-sqlite-netfx/aspnet:latest
+#          ghcr.io/alexeishcherbakov/docker-sqlite-netfx/aspnet:6.116
