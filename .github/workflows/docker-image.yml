@@ -42,7 +42,6 @@ jobs:
         context: .
         file: ./Dockerfile 
         platforms: linux/amd64,linux/arm64
-        repository: alexeishcherbakov/sqlite-netfx/aspnet
         push: true
         tags: |
           ghcr.io/alexeishcherbakov/aspnet-sqlite-netfx:latest
