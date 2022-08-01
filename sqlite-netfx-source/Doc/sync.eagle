@@ -1,0 +1,182 @@
+###############################################################################
+#
+# sync.eagle --
+#
+# Written by Joe Mistachkin.
+# Released to the public domain, use at your own risk!
+#
+###############################################################################
+
+set fileNames [list \
+    [file join json1.html] \
+    [file join lang.html] \
+    [file join lang_aggfunc.html] \
+    [file join lang_altertable.html] \
+    [file join lang_analyze.html] \
+    [file join lang_attach.html] \
+    [file join lang_comment.html] \
+    [file join lang_conflict.html] \
+    [file join lang_corefunc.html] \
+    [file join lang_createindex.html] \
+    [file join lang_createtable.html] \
+    [file join lang_createtrigger.html] \
+    [file join lang_createview.html] \
+    [file join lang_createvtab.html] \
+    [file join lang_datefunc.html] \
+    [file join lang_delete.html] \
+    [file join lang_detach.html] \
+    [file join lang_dropindex.html] \
+    [file join lang_droptable.html] \
+    [file join lang_droptrigger.html] \
+    [file join lang_dropview.html] \
+    [file join lang_explain.html] \
+    [file join lang_expr.html] \
+    [file join lang_indexedby.html] \
+    [file join lang_insert.html] \
+    [file join lang_keywords.html] \
+    [file join lang_mathfunc.html] \
+    [file join lang_naming.html] \
+    [file join lang_reindex.html] \
+    [file join lang_replace.html] \
+    [file join lang_returning.html] \
+    [file join lang_savepoint.html] \
+    [file join lang_select.html] \
+    [file join lang_transaction.html] \
+    [file join lang_update.html] \
+    [file join lang_upsert.html] \
+    [file join lang_vacuum.html] \
+    [file join lang_with.html] \
+    [file join pragma.html] \
+    [file join sqlite.css] \
+    [file join syntax.html] \
+    [file join syntaxdiagrams.html] \
+    [file join vtab.html] \
+    [file join images sqlite370_banner.gif] \
+    [file join syntax aggregate-function-invocation.html] \
+    [file join syntax alter-table-stmt.html] \
+    [file join syntax analyze-stmt.html] \
+    [file join syntax attach-stmt.html] \
+    [file join syntax begin-stmt.html] \
+    [file join syntax column-constraint.html] \
+    [file join syntax column-def.html] \
+    [file join syntax column-name-list.html] \
+    [file join syntax comment-syntax.html] \
+    [file join syntax commit-stmt.html] \
+    [file join syntax common-table-expression.html] \
+    [file join syntax compound-operator.html] \
+    [file join syntax compound-select-stmt.html] \
+    [file join syntax conflict-clause.html] \
+    [file join syntax create-index-stmt.html] \
+    [file join syntax create-table-stmt.html] \
+    [file join syntax create-trigger-stmt.html] \
+    [file join syntax create-view-stmt.html] \
+    [file join syntax create-virtual-table-stmt.html] \
+    [file join syntax cte-table-name.html] \
+    [file join syntax delete-stmt-limited.html] \
+    [file join syntax delete-stmt.html] \
+    [file join syntax detach-stmt.html] \
+    [file join syntax drop-index-stmt.html] \
+    [file join syntax drop-table-stmt.html] \
+    [file join syntax drop-trigger-stmt.html] \
+    [file join syntax drop-view-stmt.html] \
+    [file join syntax expr.html] \
+    [file join syntax factored-select-stmt.html] \
+    [file join syntax filter-clause.html] \
+    [file join syntax foreign-key-clause.html] \
+    [file join syntax frame-spec.html] \
+    [file join syntax indexed-column.html] \
+    [file join syntax insert-stmt.html] \
+    [file join syntax join-clause.html] \
+    [file join syntax join-constraint.html] \
+    [file join syntax join-operator.html] \
+    [file join syntax literal-value.html] \
+    [file join syntax numeric-literal.html] \
+    [file join syntax ordering-term.html] \
+    [file join syntax over-clause.html] \
+    [file join syntax pragma-stmt.html] \
+    [file join syntax pragma-value.html] \
+    [file join syntax qualified-table-name.html] \
+    [file join syntax raise-function.html] \
+    [file join syntax recursive-cte.html] \
+    [file join syntax reindex-stmt.html] \
+    [file join syntax release-stmt.html] \
+    [file join syntax result-column.html] \
+    [file join syntax returning-clause.html] \
+    [file join syntax rollback-stmt.html] \
+    [file join syntax savepoint-stmt.html] \
+    [file join syntax select-core.html] \
+    [file join syntax select-stmt.html] \
+    [file join syntax signed-number.html] \
+    [file join syntax simple-function-invocation.html] \
+    [file join syntax simple-select-stmt.html] \
+    [file join syntax sql-stmt-list.html] \
+    [file join syntax sql-stmt.html] \
+    [file join syntax table-constraint.html] \
+    [file join syntax table-options.html] \
+    [file join syntax table-or-subquery.html] \
+    [file join syntax type-name.html] \
+    [file join syntax update-stmt-limited.html] \
+    [file join syntax update-stmt.html] \
+    [file join syntax upsert-clause.html] \
+    [file join syntax vacuum-stmt.html] \
+    [file join syntax window-defn.html] \
+    [file join syntax window-function-invocation.html] \
+    [file join syntax with-clause.html]]
+
+###############################################################################
+
+set specialFileNames [list \
+    [file join vtab.html]]
+
+###############################################################################
+
+set path [file dirname [info script]]
+
+if {[info exists draft] && $draft} then {
+  set rootUri https://www.sqlite.org/draft
+} else {
+  set rootUri https://www.sqlite.org
+}
+
+set rootDirectory [file join $path]
+
+if {[info exists argv] && \
+    [lsearch -exact -- $argv --verbose] != -1} then {
+  set verbose true
+} else {
+  set verbose false
+}
+
+if {[info exists ::eagle_platform(frameworkVersion)] && \
+    [package vcompare $::eagle_platform(frameworkVersion) \
+        4.0.30319.42000] >= 0} then {
+  object invoke System.Net.ServicePointManager SecurityProtocol \
+      {Ssl3 Tls Tls12 Tls11}
+}
+
+foreach fileName $fileNames {
+  set uri [file join $rootUri $fileName]
+
+  if {[lsearch -exact -- $specialFileNames $fileName] != -1} then {
+    set directory [file join \
+        $rootDirectory Special Core [file dirname $fileName]]
+  } else {
+    set directory [file join \
+        $rootDirectory Extra Core [file dirname $fileName]]
+  }
+
+  set fileName [file normalize \
+      [file join $directory [file tail $fileName]]]
+
+  if {$verbose} then {
+    puts -nonewline stdout [appendArgs \
+        "Downloading \"" $uri "\" to \"" $fileName "\"... "]
+  }
+
+  catch {file delete $fileName}
+  uri download $uri $fileName
+
+  if {$verbose} then {
+    puts stdout <Ok>
+  }
+}

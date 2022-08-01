@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+ *
+ * SQLite.Core.nuspec -
+ *
+ * Written by Joe Mistachkin.
+ * Released to the public domain, use at your own risk!
+ *
+-->
+<package>
+  <metadata>
+    <id>System.Data.SQLite.Core</id>
+    <title>System.Data.SQLite Core (x86/x64)</title>
+    <version>1.0.116.0</version>
+    <authors>SQLite Development Team</authors>
+    <description>The official SQLite database engine for both x86 and x64 along with the ADO.NET provider.</description>
+    <language>en-US</language>
+    <projectUrl>https://system.data.sqlite.org/</projectUrl>
+    <iconUrl>https://system.data.sqlite.org/images/sqlite128.png</iconUrl>
+    <licenseUrl>https://www.sqlite.org/copyright.html</licenseUrl>
+    <tags>sqlite database ado.net provider interop</tags>
+    <copyright>Public Domain</copyright>
+    <dependencies>
+      <group targetFramework="net20">
+        <dependency id="Stub.System.Data.SQLite.Core.NetFramework" version="[1.0.116.0]" />
+      </group>
+      <group targetFramework="net40">
+        <dependency id="Stub.System.Data.SQLite.Core.NetFramework" version="[1.0.116.0]" />
+      </group>
+      <group targetFramework="net45">
+        <dependency id="Stub.System.Data.SQLite.Core.NetFramework" version="[1.0.116.0]" />
+      </group>
+      <group targetFramework="net451">
+        <dependency id="Stub.System.Data.SQLite.Core.NetFramework" version="[1.0.116.0]" />
+      </group>
+      <group targetFramework="net46">
+        <dependency id="Stub.System.Data.SQLite.Core.NetFramework" version="[1.0.116.0]" />
+      </group>
+      <group targetFramework="netstandard2.0">
+        <dependency id="Stub.System.Data.SQLite.Core.NetStandard" version="[1.0.116.0]" />
+      </group>
+      <group targetFramework="netstandard2.1">
+        <dependency id="Stub.System.Data.SQLite.Core.NetStandard" version="[1.0.116.0]" />
+      </group>
+    </dependencies>
+  </metadata>
+  <files />
+</package>
