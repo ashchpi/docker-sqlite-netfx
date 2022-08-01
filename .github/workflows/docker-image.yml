@@ -40,6 +40,9 @@ jobs:
       uses: docker/build-push-action@v3
       with:
         context: .
+        file: ./Dockerfile 
         platforms: linux/amd64,linux/arm64
         push: true
-        tags: alexeischerbakov/aspnet-sqlite-netfx:latest
+        tags: |
+          ${{ env.REGISTRY }}/${{ github.repository }}::latest
+          ${{ env.REGISTRY }}/${{ github.repository }}:${{ github.sha }}
