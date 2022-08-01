@@ -44,5 +44,5 @@ jobs:
         platforms: linux/amd64,linux/arm64
         push: true
         tags: |
-          alexeishcherbakov/aspnet-sqlite-netfx:latest
-          alexeishcherbakov/aspnet-sqlite-netfx:${{ github.sha }}
+          ghcr.io/alexeishcherbakov/aspnet-sqlite-netfx:latest
+          ghcr.io/alexeishcherbakov/aspnet-sqlite-netfx:${{ github.sha }}
