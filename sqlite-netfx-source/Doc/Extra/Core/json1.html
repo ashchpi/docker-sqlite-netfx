@@ -89,6 +89,31 @@ b.innerHTML='hide';
 }
 return false;
 }
+var antiRobot = 0;
+function antiRobotGo(){
+if( antiRobot!=3 ) return;
+antiRobot = 7;
+var j = document.getElementById("mtimelink");
+if(j && j.hasAttribute("data-href")) j.href=j.getAttribute("data-href");
+}
+function antiRobotDefense(){
+document.body.onmousedown=function(){
+antiRobot |= 2;
+antiRobotGo();
+document.body.onmousedown=null;
+}
+document.body.onmousemove=function(){
+antiRobot |= 2;
+antiRobotGo();
+document.body.onmousemove=null;
+}
+setTimeout(function(){
+antiRobot |= 1;
+antiRobotGo();
+}, 100)
+antiRobotGo();
+}
+antiRobotDefense();
 </script>
 <div class=fancy>
 <div class=nosearch>
@@ -212,7 +237,7 @@ There are 15 scalar functions and operators:
 </li>
 
 <li value='15'>
-<a href='#jvalid'>json_quote</a>(<i>value</i>)
+<a href='#jquote'>json_quote</a>(<i>value</i>)
 </li>
 
 
@@ -964,8 +989,8 @@ JSON and return 0 if the argument X is not well-formed JSON.
 </p><h2 id="the_json_quote_function"><span>4.12. </span>The json_quote() function</h2>
 
 <p>The json_quote(X) function converts the SQL value X (a number or a
-string) into its corresponding JSON representation.  If X is already
-well-formed JSON, then this function is a no-op.
+string) into its corresponding JSON representation.  If X is a JSON value
+returned by another JSON function, then this function is a no-op.
 
 </p><p>Examples:
 
@@ -974,13 +999,16 @@ well-formed JSON, then this function is a no-op.
 <span class='jans'>&rarr; 3.14159</span></li>
 
 <li><span class='jex'>json_quote('verdant')</span>
-<span class='jans'>&rarr; "verdant"</span></li>
+<span class='jans'>&rarr; '"verdant"'</span></li>
 
 <li><span class='jex'>json_quote('[1]')</span>
+<span class='jans'>&rarr; '"[1]"'</span></li>
+
+<li><span class='jex'>json_quote(json('[1]'))</span>
 <span class='jans'>&rarr; '[1]'</span></li>
 
 <li><span class='jex'>json_quote('[1,')</span>
-<span class='jans'>&rarr; '\"[1\"'</span></li>
+<span class='jans'>&rarr; '"[1"'</span></li>
 
 </ul>
 
@@ -1137,4 +1165,5 @@ SELECT DISTINCT json_extract(big.json,'$.id')
  WHERE json_tree.key='uuid'
    AND json_tree.value='6fa5181e-5721-11e5-a04e-57f3d7b32808';
 </pre></blockquote>
+<p align="center"><small><i>This page last modified on  <a href="https://sqlite.org/docsrc/honeypot" id="mtimelink"  data-href="https://sqlite.org/docsrc/finfo/pages/json1.in?m=a3a94372544eb4e69">2022-06-24 16:56:23</a> UTC </small></i></p>
 

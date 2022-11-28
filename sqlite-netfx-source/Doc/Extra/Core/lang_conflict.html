@@ -89,6 +89,31 @@ b.innerHTML='hide';
 }
 return false;
 }
+var antiRobot = 0;
+function antiRobotGo(){
+if( antiRobot!=3 ) return;
+antiRobot = 7;
+var j = document.getElementById("mtimelink");
+if(j && j.hasAttribute("data-href")) j.href=j.getAttribute("data-href");
+}
+function antiRobotDefense(){
+document.body.onmousedown=function(){
+antiRobot |= 2;
+antiRobotGo();
+document.body.onmousedown=null;
+}
+document.body.onmousemove=function(){
+antiRobot |= 2;
+antiRobotGo();
+document.body.onmousemove=null;
+}
+setTimeout(function(){
+antiRobot |= 1;
+antiRobotGo();
+}, 100)
+antiRobotGo();
+}
+antiRobotDefense();
 </script>
 <div class=fancy>
 <div class=nosearch>
@@ -101,8 +126,8 @@ The ON CONFLICT Clause
 
 
 <p><b><a href="syntax/conflict-clause.html">conflict-clause:</a></b>
-<button id='x1377' onclick='hideorshow("x1377","x1378")'>hide</button></p>
- <div id='x1378' class='imgcontainer'>
+<button id='x1379' onclick='hideorshow("x1379","x1380")'>hide</button></p>
+ <div id='x1380' class='imgcontainer'>
  <div style="max-width:451px"><svg xmlns='http://www.w3.org/2000/svg' class="pikchr" viewBox="0 0 451.517 205.2">
 <circle cx="5" cy="6" r="3.6"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
 <polygon points="32,6 20,10 20,2" style="fill:rgb(0,0,0)"/>
@@ -265,4 +290,5 @@ in a future release.</p>
 <p>The algorithm specified in the OR clause of an INSERT or UPDATE
 overrides any algorithm specified in a CREATE TABLE.
 If no algorithm is specified anywhere, the ABORT algorithm is used.</p>
+<p align="center"><small><i>This page last modified on  <a href="https://sqlite.org/docsrc/honeypot" id="mtimelink"  data-href="https://sqlite.org/docsrc/finfo/pages/lang_conflict.in?m=99e70e264342d2774">2021-11-01 21:09:36</a> UTC </small></i></p>
 

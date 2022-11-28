@@ -1881,7 +1881,7 @@ namespace eval ::Eagle {
       }]
     }
 
-    proc matchPlatform { platform } {
+    proc matchBuildPlatform { platform } {
       #
       # NOTE: An empty string for the platform means that the build is not
       #       [primarily] a native build; therefore, it always matches.
@@ -1948,8 +1948,8 @@ namespace eval ::Eagle {
               INTEROP_JSON1_EXTENSION INTEROP_PERCENTILE_EXTENSION \
               INTEROP_REGEXP_EXTENSION INTEROP_TEST_EXTENSION \
               INTEROP_SESSION_EXTENSION INTEROP_SHA1_EXTENSION \
-              INTEROP_TOTYPE_EXTENSION INTEROP_VIRTUAL_TABLE \
-              USE_INTEROP_DLL]
+              INTEROP_SHA3_EXTENSION INTEROP_TOTYPE_EXTENSION \
+              INTEROP_VIRTUAL_TABLE USE_INTEROP_DLL]
 
           foreach defineConstant $defineConstants {
             addConstraint [appendArgs \
@@ -2030,7 +2030,7 @@ namespace eval ::Eagle {
                   #       first available build of System.Data.SQLite and
                   #       then return immediately.
                   #
-                  if {$select && [matchPlatform $platform]} then {
+                  if {$select && [matchBuildPlatform $platform]} then {
                     #
                     # NOTE: Manually override all the build directory
                     #       selection related test settings in order to
@@ -2111,7 +2111,7 @@ namespace eval ::Eagle {
             set platform unknown
           }
 
-          if {$select && [matchPlatform $platform]} then {
+          if {$select && [matchBuildPlatform $platform]} then {
             set ::build_directory $directory
 
             tputs $channel [appendArgs "yes, selected (" $platform ")\n"]
@@ -2143,7 +2143,7 @@ namespace eval ::Eagle {
                   set platform unknown
                 }
 
-                if {$select && [matchPlatform $platform]} then {
+                if {$select && [matchBuildPlatform $platform]} then {
                   set ::build_directory $path
 
                   tputs $channel [appendArgs "yes, selected (" $platform ")\n"]
@@ -2412,7 +2412,7 @@ namespace eval ::Eagle {
       set count 0
       set names [list]
 
-      if {[isObjectHandle $object] && $object ne "null"} then {
+      if {[isNonNullObjectHandle $object]} then {
         eval lappend names [object members \
             -membertypes Property -nameonly $object]
 
@@ -2424,7 +2424,7 @@ namespace eval ::Eagle {
         if {[catch {
           object invoke -objectflags +NoDispose $object $name
         } value] == 0} then {
-          if {[isObjectHandle $value] && $value ne "null"} then {
+          if {[isNonNullObjectHandle $value]} then {
             set error null; object invoke -flags +NonPublic \
                 -marshalflags +NoHandle Interpreter.GetActive \
                 AddObjectReference Ok $value error
@@ -2487,7 +2487,7 @@ namespace eval ::Eagle {
             set name [appendArgs $arrayName ( $elementName )]
             set varValue [uplevel 1 [list set $name]]
 
-            if {$objects && [isObjectHandle $varValue]} then {
+            if {$objects && [isNonNullObjectHandle $varValue]} then {
               unset -nocomplain properties
               getAllProperties $varValue properties
 
@@ -2499,7 +2499,7 @@ namespace eval ::Eagle {
         } else {
           set varValue [uplevel 1 [list set $varName]]
 
-          if {$objects && [isObjectHandle $varValue]} then {
+          if {$objects && [isNonNullObjectHandle $varValue]} then {
             unset -nocomplain properties
             getAllProperties $varValue properties
 
@@ -2516,12 +2516,12 @@ namespace eval ::Eagle {
     proc enumerableToList { enumerable } {
       set result [list]
 
-      if {[string length $enumerable] == 0 || $enumerable eq "null"} then {
+      if {![isNonNullObjectHandle $enumerable]} then {
         return $result
       }
 
       object foreach -alias item $enumerable {
-        if {[string length $item] > 0} then {
+        if {[isNonNullObjectHandle $item]} then {
           lappend result [$item ToString]
         }
       }
@@ -3447,7 +3447,8 @@ namespace eval ::Eagle {
       return ""
     }
 
-    proc freeDbConnection { {varName connection} } {
+    proc freeDbConnection {
+            {varName connection} {dispose true} {quiet false} } {
       #
       # NOTE: Refer to the specified variable (e.g. "connection") in the
       #       context of our caller.  The opaque object handle for an ADO.NET
@@ -3458,18 +3459,24 @@ namespace eval ::Eagle {
 
       #
       # NOTE: Attempt to remove the opaque object handle from the interpreter
-      #       now.  This [object dispose] call will not actually dispose of the
-      #       underlying object because the +NoDispose flag was set on it
+      #       now.  This [object dispose] call will not actually dispose of
+      #       the underlying object because the +NoDispose flag was set on it
       #       during creation of the opaque object handle.
       #
-      if {[info exists connection] && \
-          [catch {object dispose $connection} error]} then {
-        #
-        # NOTE: We somehow failed to remove the handle, report why.
-        #
-        tputs $::test_channel [appendArgs \
-            "==== WARNING: failed to remove connection handle \"" $connection \
-            "\", error: " \n\t $error \n]
+      if {[info exists connection] && [catch {
+        set command [list object dispose]
+
+        if {!$dispose} then {
+          lappend command -nodispose
+        }
+
+        lappend command $connection; eval $command
+      } error]} then {
+        if {!$quiet} then {
+          tputs $::test_channel [appendArgs \
+              "==== WARNING: failed to remove connection object handle \"" \
+              $connection "\", error: " \n\t $error \n]
+        }
       }
     }
 
@@ -3494,6 +3501,13 @@ namespace eval ::Eagle {
       #
       object invoke -flags +NonPublic Interpreter.GetActive.connections Add \
           $db $connection
+    }
+
+    proc removeDbConnection { {varName db} } {
+      upvar 1 $varName db
+
+      object invoke -flags +NonPublic \
+          Interpreter.GetActive.connections Remove $db
     }
 
     proc removeDbTransaction { transaction } {
@@ -3559,7 +3573,7 @@ namespace eval ::Eagle {
           }
 
           if {$code == $Continue} then {
-            if {[string length $value] > 0 && \
+            if {[isNonNullObjectHandle $value] && \
                 ![object invoke Convert IsDBNull $value]} then {
               lappend row [list $names($index) [$value ToString]]
             } else {
@@ -3598,7 +3612,21 @@ namespace eval ::Eagle {
     }
 
     proc cleanupDb { fileName {varName db} {collect true} {qualify true}
-                     {delete true} } {
+            {delete true} {pool true} {quiet false} } {
+      #
+      # NOTE: First, if requested, attempt to clear all connection pools in
+      #       this application domain.
+      #
+      if {$pool && [catch {
+        object invoke System.Data.SQLite.SQLiteConnection ClearAllPools
+      } error]} then {
+        if {!$quiet} then {
+          tputs $::test_channel [appendArgs \
+              "==== WARNING: failed to clear all pools, error: " \
+              \n\t $error \n]
+        }
+      }
+
       #
       # NOTE: Attempt to force all pending "garbage" objects to be collected,
       #       including SQLite statements and backup objects; this should allow
@@ -3609,9 +3637,9 @@ namespace eval ::Eagle {
       }
 
       #
-      # NOTE: Refer to the specified variable (e.g. "db") in the context of our
-      #       caller.  The handle to the database previously opened via the
-      #       [setupDb] procedure should be stored there.
+      # NOTE: Refer to the specified variable (e.g. "db") in the context of
+      #       our caller.  The handle to the database previously opened via
+      #       the [setupDb] procedure should be stored there.
       #
       upvar 1 $varName db
 
@@ -3620,12 +3648,13 @@ namespace eval ::Eagle {
       #       to delete the underlying database file.
       #
       if {[info exists db] && [catch {sql close $db} error]} then {
-        #
-        # NOTE: We somehow failed to close the database, report why.
-        #
-        tputs $::test_channel [appendArgs \
-            "==== WARNING: failed to close database \"" $db "\", error: " \
-            \n\t $error \n]
+        if {!$quiet} then {
+          tputs $::test_channel [appendArgs \
+              "==== WARNING: failed to close database \"" $db \
+              "\", error: " \n\t $error \n]
+        }
+
+        removeDbConnection
       }
 
       #
@@ -3640,16 +3669,16 @@ namespace eval ::Eagle {
       set isMemory [isMemoryDb $fileName]
 
       #
-      # NOTE: Build the full path to the database file name.  For now, all test
-      #       database files are stored in the temporary directory.
+      # NOTE: Build the full path to the database file name.  For now, all
+      #       test database files are stored in the temporary directory.
       #
       if {!$isMemory && $qualify} then {
         set fileName [file join [getDatabaseDirectory] [file tail $fileName]]
       }
 
       #
-      # NOTE: Check if the file still exists; initially, assume all files will
-      #       be deleted successfully, if necessary.
+      # NOTE: Check if the file still exists; initially, assume all files
+      #       will be deleted successfully, if necessary.
       #
       set success true
 
@@ -3666,24 +3695,30 @@ namespace eval ::Eagle {
 
           if {[file exists $walFileName]} then {
             #
-            # NOTE: If there is a WAL file, it should be zero bytes at this
-            #       point.
+            # NOTE: If there is a WAL file, it should be zero bytes at
+            #       this point.
             #
             if {[set size [file size $walFileName]] == 0} then {
-              #
-              # NOTE: We somehow failed to delete the WAL file, report why.
-              #
               if {[catch {file delete $walFileName} error]} then {
-                tputs $::test_channel [appendArgs \
-                    "==== WARNING: failed to delete WAL file \"" $walFileName \
-                    "\" during cleanup, error: " \n\t $error \n]
+                #
+                # NOTE: We somehow failed to delete the WAL file, report
+                #       why.
+                #
+                if {!$quiet} then {
+                  tputs $::test_channel [appendArgs \
+                      "==== WARNING: failed to delete WAL file \"" \
+                      $walFileName "\" during cleanup, error: " \n\t \
+                      $error \n]
+                }
 
                 set success false
               }
             } else {
-              tputs $::test_channel [appendArgs \
-                  "==== WARNING: WAL file \"" $walFileName "\" is " $size \
-                  " bytes in size, skipping all file deletions...\n"]
+              if {!$quiet} then {
+                tputs $::test_channel [appendArgs \
+                    "==== WARNING: WAL file \"" $walFileName "\" is " \
+                    $size " bytes in size, skipping file deletions...\n"]
+              }
 
               return 1; # error
             }
@@ -3696,12 +3731,12 @@ namespace eval ::Eagle {
 
           if {[file exists $shmFileName] && \
               [catch {file delete $shmFileName} error]} then {
-            #
-            # NOTE: We somehow failed to delete the SHM file, report why.
-            #
-            tputs $::test_channel [appendArgs \
-                "==== WARNING: failed to delete SHM file \"" $shmFileName \
-                "\" during cleanup, error: " \n\t $error \n]
+            if {!$quiet} then {
+              tputs $::test_channel [appendArgs \
+                  "==== WARNING: failed to delete SHM file \"" \
+                  $shmFileName "\" during cleanup, error: " \n\t \
+                  $error \n]
+            }
 
             set success false
           }
@@ -3710,22 +3745,24 @@ namespace eval ::Eagle {
           # NOTE: Attempt to delete the test database file now.
           #
           if {[catch {file delete $fileName} error]} then {
-            #
-            # NOTE: We somehow failed to delete the file, report why.
-            #
-            tputs $::test_channel [appendArgs \
-                "==== WARNING: failed to delete database file \"" $fileName \
-                "\" during cleanup, error: " \n\t $error \n]
+            if {!$quiet} then {
+              tputs $::test_channel [appendArgs \
+                  "==== WARNING: failed to delete database file \"" \
+                  $fileName "\" during cleanup, error: " \n\t \
+                  $error \n]
+            }
 
             set success false
           }
         } else {
           #
-          # NOTE: Show that we skipped deleting the file.
+          # NOTE: Skipped deleting test database file.
           #
-          tputs $::test_channel [appendArgs \
-              "==== WARNING: skipped deleting database file \"" $fileName \
-              "\" during cleanup\n"]
+          if {!$quiet} then {
+            tputs $::test_channel [appendArgs \
+                "==== WARNING: skipped deleting database file \"" \
+                $fileName "\" during cleanup\n"]
+          }
         }
       }
 
@@ -5874,8 +5911,9 @@ namespace eval ::Eagle {
             INTEROP_INCLUDE_ZIPVFS INTEROP_JSON1_EXTENSION \
             INTEROP_LEGACY_CLOSE INTEROP_LOG INTEROP_PERCENTILE_EXTENSION \
             INTEROP_REGEXP_EXTENSION INTEROP_SESSION_EXTENSION \
-            INTEROP_SHA1_EXTENSION INTEROP_TEST_EXTENSION \
-            INTEROP_TOTYPE_EXTENSION INTEROP_VIRTUAL_TABLE \
+            INTEROP_SHA1_EXTENSION INTEROP_SHA3_EXTENSION \
+            INTEROP_TEST_EXTENSION INTEROP_TOTYPE_EXTENSION \
+            INTEROP_VIRTUAL_TABLE \
             NET_20 NET_35 NET_40 NET_45 NET_451 NET_452 NET_46 NET_461 \
             NET_462 NET_47 NET_471 NET_472 NET_48 NET_COMPACT_20 \
             NET_STANDARD_20 NET_STANDARD_21 PLATFORM_COMPACTFRAMEWORK \

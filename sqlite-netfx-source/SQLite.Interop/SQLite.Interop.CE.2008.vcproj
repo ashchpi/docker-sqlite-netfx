@@ -73,7 +73,7 @@
 			/>
 			<Tool
 				Name="VCResourceCompilerTool"
-				PreprocessorDefinitions="_DEBUG;_WIN32_WCE=$(CEVER);UNDER_CE;$(PLATFORMDEFINES);&quot;INTEROP_RC_VERSION=$(INTEROP_RC_VERSION)&quot;"
+				PreprocessorDefinitions="_DEBUG;RC_MSC_VER=1500;_WIN32_WCE=$(CEVER);UNDER_CE;$(PLATFORMDEFINES);$(INTEROP_RESOURCE_DEFINES);&quot;INTEROP_RC_VERSION=$(INTEROP_RC_VERSION)&quot;"
 				Culture="1033"
 				AdditionalIncludeDirectories="$(IntDir)"
 			/>
@@ -172,7 +172,7 @@
 			/>
 			<Tool
 				Name="VCResourceCompilerTool"
-				PreprocessorDefinitions="NDEBUG;_WIN32_WCE=$(CEVER);UNDER_CE;$(PLATFORMDEFINES);&quot;INTEROP_RC_VERSION=$(INTEROP_RC_VERSION)&quot;"
+				PreprocessorDefinitions="NDEBUG;RC_MSC_VER=1500;_WIN32_WCE=$(CEVER);UNDER_CE;$(PLATFORMDEFINES);$(INTEROP_RESOURCE_DEFINES);&quot;INTEROP_RC_VERSION=$(INTEROP_RC_VERSION)&quot;"
 				Culture="1033"
 				AdditionalIncludeDirectories="$(IntDir)"
 			/>
@@ -272,7 +272,7 @@
 			/>
 			<Tool
 				Name="VCResourceCompilerTool"
-				PreprocessorDefinitions="_DEBUG;_WIN32_WCE=$(CEVER);UNDER_CE;$(PLATFORMDEFINES);&quot;INTEROP_RC_VERSION=$(INTEROP_RC_VERSION)&quot;"
+				PreprocessorDefinitions="_DEBUG;RC_MSC_VER=1500;_WIN32_WCE=$(CEVER);UNDER_CE;$(PLATFORMDEFINES);$(INTEROP_RESOURCE_DEFINES);&quot;INTEROP_RC_VERSION=$(INTEROP_RC_VERSION)&quot;"
 				Culture="1033"
 				AdditionalIncludeDirectories="$(IntDir)"
 			/>
@@ -369,7 +369,7 @@
 			/>
 			<Tool
 				Name="VCResourceCompilerTool"
-				PreprocessorDefinitions="_DEBUG;_WIN32_WCE=$(CEVER);UNDER_CE;$(PLATFORMDEFINES);&quot;INTEROP_RC_VERSION=$(INTEROP_RC_VERSION)&quot;"
+				PreprocessorDefinitions="_DEBUG;RC_MSC_VER=1500;_WIN32_WCE=$(CEVER);UNDER_CE;$(PLATFORMDEFINES);$(INTEROP_RESOURCE_DEFINES);&quot;INTEROP_RC_VERSION=$(INTEROP_RC_VERSION)&quot;"
 				Culture="1033"
 				AdditionalIncludeDirectories="$(IntDir)"
 			/>
@@ -466,7 +466,7 @@
 			/>
 			<Tool
 				Name="VCResourceCompilerTool"
-				PreprocessorDefinitions="NDEBUG;_WIN32_WCE=$(CEVER);UNDER_CE;$(PLATFORMDEFINES);&quot;INTEROP_RC_VERSION=$(INTEROP_RC_VERSION)&quot;"
+				PreprocessorDefinitions="NDEBUG;RC_MSC_VER=1500;_WIN32_WCE=$(CEVER);UNDER_CE;$(PLATFORMDEFINES);$(INTEROP_RESOURCE_DEFINES);&quot;INTEROP_RC_VERSION=$(INTEROP_RC_VERSION)&quot;"
 				Culture="1033"
 				AdditionalIncludeDirectories="$(IntDir)"
 			/>
@@ -565,7 +565,7 @@
 			/>
 			<Tool
 				Name="VCResourceCompilerTool"
-				PreprocessorDefinitions="NDEBUG;_WIN32_WCE=$(CEVER);UNDER_CE;$(PLATFORMDEFINES);&quot;INTEROP_RC_VERSION=$(INTEROP_RC_VERSION)&quot;"
+				PreprocessorDefinitions="NDEBUG;RC_MSC_VER=1500;_WIN32_WCE=$(CEVER);UNDER_CE;$(PLATFORMDEFINES);$(INTEROP_RESOURCE_DEFINES);&quot;INTEROP_RC_VERSION=$(INTEROP_RC_VERSION)&quot;"
 				Culture="1033"
 				AdditionalIncludeDirectories="$(IntDir)"
 			/>
@@ -944,6 +944,58 @@
 			</File>
 			<File
 				RelativePath=".\src\ext\sha1.c"
+				>
+				<FileConfiguration
+					Name="Debug|Pocket PC 2003 (ARMV4)"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Pocket PC 2003 (ARMV4)"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug|Windows Mobile 5.0 Pocket PC SDK (ARMV4I)"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug|Windows Mobile 5.0 Smartphone SDK (ARMV4I)"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Windows Mobile 5.0 Pocket PC SDK (ARMV4I)"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Windows Mobile 5.0 Smartphone SDK (ARMV4I)"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\src\ext\shathree.c"
 				>
 				<FileConfiguration
 					Name="Debug|Pocket PC 2003 (ARMV4)"

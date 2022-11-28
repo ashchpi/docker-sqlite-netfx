@@ -89,13 +89,38 @@ b.innerHTML='hide';
 }
 return false;
 }
+var antiRobot = 0;
+function antiRobotGo(){
+if( antiRobot!=3 ) return;
+antiRobot = 7;
+var j = document.getElementById("mtimelink");
+if(j && j.hasAttribute("data-href")) j.href=j.getAttribute("data-href");
+}
+function antiRobotDefense(){
+document.body.onmousedown=function(){
+antiRobot |= 2;
+antiRobotGo();
+document.body.onmousedown=null;
+}
+document.body.onmousemove=function(){
+antiRobot |= 2;
+antiRobotGo();
+document.body.onmousemove=null;
+}
+setTimeout(function(){
+antiRobot |= 1;
+antiRobotGo();
+}, 100)
+antiRobotGo();
+}
+antiRobotDefense();
 </script>
 
 
 
 <p><b><a href="syntax/drop-trigger-stmt.html">drop-trigger-stmt:</a></b>
-<button id='x1713' onclick='hideorshow("x1713","x1714")'>hide</button></p>
- <div id='x1714' class='imgcontainer'>
+<button id='x1715' onclick='hideorshow("x1715","x1716")'>hide</button></p>
+ <div id='x1716' class='imgcontainer'>
  <div style="max-width:795px"><svg xmlns='http://www.w3.org/2000/svg' class="pikchr" viewBox="0 0 795.37 54">
 <circle cx="5" cy="17" r="3.6"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
 <polygon points="32,17 20,21 20,12" style="fill:rgb(0,0,0)"/>
@@ -147,4 +172,5 @@ not fired by any subsequent INSERT, UPDATE or DELETE statements.
 
 <p>Note that triggers are automatically dropped when the associated table is
 dropped.
+<p align="center"><small><i>This page last modified on  <a href="https://sqlite.org/docsrc/honeypot" id="mtimelink"  data-href="https://sqlite.org/docsrc/finfo/pages/lang_droptrigger.in?m=975cc0579703ac0d7">2020-06-19 13:05:24</a> UTC </small></i></p>
 

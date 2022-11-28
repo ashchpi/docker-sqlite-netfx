@@ -16,7 +16,11 @@ REM SET __ECHO2=ECHO
 REM SET __ECHO3=ECHO
 IF NOT DEFINED _AECHO (SET _AECHO=REM)
 IF NOT DEFINED _CECHO (SET _CECHO=REM)
+IF NOT DEFINED _CECHO2 (SET _CECHO2=REM)
+IF NOT DEFINED _CECHO3 (SET _CECHO3=REM)
 IF NOT DEFINED _VECHO (SET _VECHO=REM)
+
+CALL :fn_UnsetVariable BREAK
 
 %_AECHO% Running %0 %*
 
@@ -65,6 +69,7 @@ IF DEFINED NO_NUGET_VERSION (
   GOTO skip_nuGetVersion
 )
 
+%_CECHO2% PUSHD "%ROOT%\Externals\Eagle\bin\netFramework40"
 %__ECHO2% PUSHD "%ROOT%\Externals\Eagle\bin\netFramework40"
 
 IF ERRORLEVEL 1 (
@@ -86,6 +91,7 @@ IF NOT DEFINED NUGET_VERSION (
   GOTO errors
 )
 
+%_CECHO2% POPD
 %__ECHO2% POPD
 
 IF ERRORLEVEL 1 (
@@ -238,6 +244,19 @@ IF ERRORLEVEL 1 (
 )
 
 GOTO no_errors
+
+:fn_UnsetVariable
+  SETLOCAL
+  SET VALUE=%1
+  IF DEFINED VALUE (
+    SET VALUE=
+    ENDLOCAL
+    SET %VALUE%=
+  ) ELSE (
+    ENDLOCAL
+  )
+  CALL :fn_ResetErrorLevel
+  GOTO :EOF
 
 :fn_ResetErrorLevel
   VERIFY > NUL

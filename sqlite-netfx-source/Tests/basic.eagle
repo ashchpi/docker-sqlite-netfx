@@ -1025,6 +1025,7 @@ runTest {test data-1.17 {SQLiteConnectionStringBuilder properties} -body {
   if {$code eq "Ok"} then {
     set keys [list null Version Synchronous UseUTF16Encoding Pooling \
                    BinaryGUID "Data Source" Uri FullUri "Default Timeout" \
+                   DefaultMaximumSleepTime \
                    Enlist FailIfMissing "Legacy Format" "Read Only" \
                    Password "Page Size" "Max Page Count" "Cache Size" \
                    DateTimeFormat DateTimeKind DateTimeFormatString \
@@ -1037,7 +1038,7 @@ runTest {test data-1.17 {SQLiteConnectionStringBuilder properties} -body {
 
     set values [list null 3 Normal True False \
                      True test.db test.db file:test.db 60 \
-                     False True False True \
+                     120 False True False True \
                      secret 4096 1024 8192 \
                      UnixEpoch Utc yyyy-MM-dd sqlite_schema \
                      Memory Serializable False \
@@ -1047,6 +1048,7 @@ runTest {test data-1.17 {SQLiteConnectionStringBuilder properties} -body {
 
     set propertyNames [list null Version SyncMode UseUTF16Encoding Pooling \
                             BinaryGUID DataSource Uri FullUri DefaultTimeout \
+                            DefaultMaximumSleepTime \
                             Enlist FailIfMissing LegacyFormat ReadOnly \
                             Password PageSize MaxPageCount CacheSize \
                             DateTimeFormat DateTimeKind DateTimeFormatString \
@@ -1077,8 +1079,9 @@ System.Data.SQLite compileCSharp} -match regexp -result \
 Version=3\} 0 \{Normal, Synchronous=Normal\} 0 \{True, UseUTF16Encoding=True\}\
 0 \{False, Pooling=False\} 0 \{True, BinaryGUID=True\} 0 \{test\.db, Data\
 Source=test\.db\} 0 \{test\.db, Uri=test\.db\} 0 \{file:test.db,\
-FullUri=file:test\.db\} 0 \{60, Default Timeout=60\} 0 \{False, Enlist=False\}\
-0 \{True, FailIfMissing=True\} 0 \{False, Legacy Format=False\} 0 \{True, Read\
+FullUri=file:test\.db\} 0 \{60, Default Timeout=60\} 0 \{120,\
+DefaultMaximumSleepTime=120\} 0 \{False, Enlist=False\} 0 \{True,\
+FailIfMissing=True\} 0 \{False, Legacy Format=False\} 0 \{True, Read\
 Only=True\} 0 \{secret, Password=secret\} 0 \{4096, Page Size=4096\} 0 \{1024,\
 Max Page Count=1024\} 0 \{8192, Cache Size=8192\} 0 \{UnixEpoch,\
 DateTimeFormat=UnixEpoch\} 0 \{Utc, DateTimeKind=Utc\} 0 \{yyyy-MM-dd,\
@@ -3647,14 +3650,10 @@ runTest {test data-1.74 {bind functions using delegate} -setup {
   }
 
   proc getHashCode { value } {
-    if {[isObjectHandle $value]} then {
-      if {$value eq "null"} then {
-        return 0
-      } else {
-        return [object invoke $value GetHashCode]
-      }
+    if {[isNonNullObjectHandle $value]} then {
+      return [object invoke $value GetHashCode]
     } else {
-      if {[string length $value] == 0} then {
+      if {[string length $value] == 0 || $value eq "null"} then {
         return 0
       } else {
         set string [object create String $value]
@@ -3667,7 +3666,7 @@ runTest {test data-1.74 {bind functions using delegate} -setup {
   proc hashManagedArray { array } {
     set data ""
 
-    if {[isObjectHandle $array] && $array ne "null"} then {
+    if {[isNonNullObjectHandle $array]} then {
       if {[object invoke $array GetType.IsArray]} then {
         for {set index 0} {$index < [$array Length]} {incr index} {
           set element [$array -create -alias GetValue $index]
@@ -3691,7 +3690,7 @@ runTest {test data-1.74 {bind functions using delegate} -setup {
 
     set name [lindex $args 0]
 
-    if {[isObjectHandle $name] && $name ne "null"} then {
+    if {[isNonNullObjectHandle $name]} then {
       set name [object invoke $name ToString]
     }
 
@@ -4557,8 +4556,8 @@ System.Data.SQLite} -result {4 {110 111 112 101} {49 57 56 52} 4 {49 57 56 52}\
 
 ###############################################################################
 
-runTest {test data-1.85 {sha1 extension} -setup {
-  setupDb [set fileName data-1.85.db]
+runTest {test data-1.85.1 {sha1 extension} -setup {
+  setupDb [set fileName data-1.85.1.db]
 } -body {
   sql execute $db {
     CREATE TABLE t1(x);
@@ -4597,6 +4596,49 @@ defineConstant.System.Data.SQLite.INTEROP_SHA1_EXTENSION\
 System.Data.SQLite SQLiteInterop} -result \
 {5578139b470e35a3c231a499d06589215e46e8df\
 a27f5e6f85a3872ed2e4e4018c8fd7dfaff052bc}}
+
+###############################################################################
+
+runTest {test data-1.85.2 {sha3 extension} -setup {
+  setupDb [set fileName data-1.85.2.db]
+} -body {
+  sql execute $db {
+    CREATE TABLE t1(x);
+    INSERT INTO t1 (x) VALUES(NULL);
+    INSERT INTO t1 (x) VALUES(1);
+    INSERT INTO t1 (x) VALUES('zero');
+    INSERT INTO t1 (x) VALUES(1.23);
+    INSERT INTO t1 (x) VALUES(x'45');
+  }
+
+  set connection [getDbConnection]
+  set result [list]
+
+  $connection EnableExtensions true
+
+  $connection LoadExtension \
+      [getCoreExtensionBinaryFileName null] sqlite3_shathree_init
+
+  lappend result [sql execute -execute scalar $db \
+      {SELECT hex(sha3('groundhog'));}]
+
+  lappend result [sql execute -execute scalar $db \
+      {SELECT hex(sha3_query('SELECT x FROM t1 ORDER BY x;'));}]
+
+  set result
+} -cleanup {
+  freeDbConnection
+
+  unset -nocomplain result connection
+
+  cleanupDb $fileName
+
+  unset -nocomplain db fileName
+} -constraints {eagle command.object monoBug28 command.sql compile.DATA SQLite\
+defineConstant.System.Data.SQLite.INTEROP_SHA3_EXTENSION\
+System.Data.SQLite SQLiteInterop} -result \
+{2EB66C04C691A426EDED9DDD02BC6E2468B574D86EB0869BA134B7F0EA8FD465\
+658FEDE13AEF1ED773A7C98DC588216E0D1E96F1D4436E172479517A43B87973}}
 
 ###############################################################################
 

@@ -16,7 +16,11 @@ REM SET __ECHO2=ECHO
 REM SET __ECHO3=ECHO
 IF NOT DEFINED _AECHO (SET _AECHO=REM)
 IF NOT DEFINED _CECHO (SET _CECHO=REM)
+IF NOT DEFINED _CECHO2 (SET _CECHO2=REM)
+IF NOT DEFINED _CECHO3 (SET _CECHO3=REM)
 IF NOT DEFINED _VECHO (SET _VECHO=REM)
+
+CALL :fn_UnsetVariable BREAK
 
 %_AECHO% Running %0 %*
 
@@ -92,6 +96,7 @@ IF EXIST "%TOOLS%\set_%CONFIGURATION%_%PLATFORM%.bat" (
   CALL :fn_ResetErrorLevel
 
   %_AECHO% Running "%TOOLS%\set_%CONFIGURATION%_%PLATFORM%.bat"...
+  %_CECHO3% CALL "%TOOLS%\set_%CONFIGURATION%_%PLATFORM%.bat"
   %__ECHO3% CALL "%TOOLS%\set_%CONFIGURATION%_%PLATFORM%.bat"
 
   IF ERRORLEVEL 1 (
@@ -105,6 +110,7 @@ IF NOT DEFINED NOUSER (
     CALL :fn_ResetErrorLevel
 
     %_AECHO% Running "%TOOLS%\set_user_%USERNAME%_%BASE_CONFIGURATION%_%PLATFORM%.bat"...
+    %_CECHO3% CALL "%TOOLS%\set_user_%USERNAME%_%BASE_CONFIGURATION%_%PLATFORM%.bat"
     %__ECHO3% CALL "%TOOLS%\set_user_%USERNAME%_%BASE_CONFIGURATION%_%PLATFORM%.bat"
 
     IF ERRORLEVEL 1 (
@@ -117,6 +123,7 @@ IF NOT DEFINED NOUSER (
     CALL :fn_ResetErrorLevel
 
     %_AECHO% Running "%TOOLS%\set_user_%USERNAME%_%BASE_CONFIGURATION%.bat"...
+    %_CECHO3% CALL "%TOOLS%\set_user_%USERNAME%_%BASE_CONFIGURATION%.bat"
     %__ECHO3% CALL "%TOOLS%\set_user_%USERNAME%_%BASE_CONFIGURATION%.bat"
 
     IF ERRORLEVEL 1 (
@@ -129,6 +136,7 @@ IF NOT DEFINED NOUSER (
     CALL :fn_ResetErrorLevel
 
     %_AECHO% Running "%TOOLS%\set_user_%USERNAME%.bat"...
+    %_CECHO3% CALL "%TOOLS%\set_user_%USERNAME%.bat"
     %__ECHO3% CALL "%TOOLS%\set_user_%USERNAME%.bat"
 
     IF ERRORLEVEL 1 (
@@ -435,6 +443,7 @@ REM ****************************************************************************
 
 CALL :fn_ResetErrorLevel
 
+%_CECHO2% PUSHD "%ROOT%"
 %__ECHO2% PUSHD "%ROOT%"
 
 IF ERRORLEVEL 1 (
@@ -455,6 +464,11 @@ IF DEFINED USEDOTNET IF DEFINED INTEROPONLY (
 %_VECHO% InteropYear = '%INTEROPYEAR%'
 %_VECHO% NoBuildToolDir = '%NOBUILDTOOLDIR%'
 %_VECHO% UseDotNet = '%USEDOTNET%'
+%_VECHO% Solution = '%SOLUTION%'
+%_VECHO% CoreOnly = '%COREONLY%'
+%_VECHO% InteropOnly = '%INTEROPONLY%'
+%_VECHO% StaticOnly = '%STATICONLY%'
+%_VECHO% BuildFull = '%BUILD_FULL%'
 
 CALL :fn_SetupSolution
 
@@ -627,6 +641,7 @@ REM ****************************************************************************
 REM **************************** Restore Directory *****************************
 REM ****************************************************************************
 
+%_CECHO2% POPD
 %__ECHO2% POPD
 
 IF ERRORLEVEL 1 (
@@ -1031,7 +1046,7 @@ REM ****************************************************************************
     SET SOLUTION=.\SQLite.NET.%YEAR%.sln
     GOTO :EOF
   )
-  %_AECHO% Building all projects...
+  %_AECHO% Building all MSBuild projects...
   SET SOLUTION=.\SQLite.NET.%YEAR%.MSBuild.sln
   GOTO :EOF
 

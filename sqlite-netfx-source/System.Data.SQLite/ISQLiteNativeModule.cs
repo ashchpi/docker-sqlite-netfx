@@ -85,7 +85,7 @@ namespace System.Data.SQLite
         /// int sqlite3_vtab_config(sqlite3 *db, int op, ...);
         /// </code></para>
         /// <para>
-        /// Call calls to sqlite3_vtab_config() are optional.  But for maximum
+        /// Calls to sqlite3_vtab_config() are optional.  But for maximum
         /// security, it is recommended that virtual table implementations
         /// invoke "sqlite3_vtab_config(db, SQLITE_VTAB_DIRECTONLY)" if the
         /// virtual table will not be used from inside of triggers or views.
@@ -842,7 +842,7 @@ namespace System.Data.SQLite
         /// <![CDATA[</li>]]><![CDATA[</ol>]]>
         /// <para>
         /// The xBestIndex method will be invoked once for each of the potential
-        /// plans above.  For plan 1, the aConstraint[].usable flag for for the
+        /// plans above.  For plan 1, the aConstraint[].usable flag for the
         /// SQLITE_CONSTRAINT_EQ constraint on the param1 column will be true because
         /// the right-hand side value for the "param1 = ?" constraint will be known,
         /// since it is determined by the outer realtab loop.

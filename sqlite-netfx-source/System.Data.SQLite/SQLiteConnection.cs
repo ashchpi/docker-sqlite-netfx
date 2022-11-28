@@ -1209,6 +1209,12 @@ namespace System.Data.SQLite
   /// <description>30</description>
   /// </item>
   /// <item>
+  /// <description>DefaultMaximumSleepTime</description>
+  /// <description>{time in milliseconds}<br/>The default maximum sleep time for new commands</description>
+  /// <description>N</description>
+  /// <description>150</description>
+  /// </item>
+  /// <item>
   /// <description>BusyTimeout</description>
   /// <description>{time in milliseconds}<br/>Sets the busy timeout for the core library.</description>
   /// <description>N</description>
@@ -1377,6 +1383,7 @@ namespace System.Data.SQLite
     private const int DefaultCacheSize = -2000;
     private const int DefaultMaxPoolSize = 100;
     private const int DefaultConnectionTimeout = 30;
+    internal const int DefaultConnectionMaximumSleepTime = 150;
     private const int DefaultBusyTimeout = 0;
     private const int DefaultWaitTimeout = 30000;
     private const bool DefaultNoDefaultFlags = false;
@@ -1603,6 +1610,11 @@ namespace System.Data.SQLite
     private int _defaultTimeout;
 
     /// <summary>
+    /// Default command maximum sleep time.
+    /// </summary>
+    internal int _defaultMaximumSleepTime;
+
+    /// <summary>
     /// The default busy timeout to use with the SQLite core library.  This is
     /// only used when opening a connection.
     /// </summary>
@@ -1782,6 +1794,7 @@ namespace System.Data.SQLite
         _defaultTypeName = _DefaultTypeName;
         _vfsName = DefaultVfsName;
         _defaultTimeout = DefaultConnectionTimeout;
+        _defaultMaximumSleepTime = DefaultConnectionMaximumSleepTime;
         _busyTimeout = DefaultBusyTimeout;
 
 #if !PLATFORM_COMPACTFRAMEWORK
@@ -2028,8 +2041,11 @@ namespace System.Data.SQLite
         )
     {
 #if !PLATFORM_COMPACTFRAMEWORK
-        if ((connection != null) && !connection.CanRaiseEvents)
+        if ((connection != null) &&
+            !connection.disposed && !connection.CanRaiseEvents)
+        {
             return;
+        }
 #endif
 
         SQLiteConnectionEventHandler handlers;
@@ -2969,6 +2985,12 @@ namespace System.Data.SQLite
     /// </param>
     protected override void Dispose(bool disposing)
     {
+        OnChanged(this, new ConnectionEventArgs(
+            disposing ?
+                SQLiteConnectionEventType.DisposingConnection :
+                SQLiteConnectionEventType.FinalizingConnection,
+            null, null, null, null, null, null, null));
+
 #if !NET_COMPACT_20 && TRACE_WARNING
         if (HelperMethods.HasFlags(_flags, SQLiteConnectionFlags.TraceWarning))
         {
@@ -3010,6 +3032,12 @@ namespace System.Data.SQLite
             // NOTE: Everything should be fully disposed at this point.
             //
             disposed = true;
+
+            OnChanged(this, new ConnectionEventArgs(
+                disposing ?
+                    SQLiteConnectionEventType.DisposedConnection :
+                    SQLiteConnectionEventType.FinalizedConnection,
+                null, null, null, null, null, null, null));
         }
     }
     #endregion
@@ -3224,6 +3252,9 @@ namespace System.Data.SQLite
     {
       CheckDisposed();
 
+      if (Object.ReferenceEquals(_lastConnectionInOpen, this))
+          _lastConnectionInOpen = null; /* THREAD-SAFE: per-thread datum. */
+
       OnChanged(this, new ConnectionEventArgs(
           SQLiteConnectionEventType.Closing, null, null, null, null, null,
           null, null));
@@ -3276,6 +3307,12 @@ namespace System.Data.SQLite
         }
         _transactionLevel = 0;
         _transactionSequence = 0;
+      }
+      else
+      {
+          OnChanged(this, new ConnectionEventArgs(
+              SQLiteConnectionEventType.NothingToDo,
+              null, null, null, null, null, null, null));
       }
 
       StateChangeEventArgs eventArgs = null;
@@ -4654,6 +4691,11 @@ namespace System.Data.SQLite
         if (stringValue != null)
             _defaultTimeout = Convert.ToInt32(stringValue, CultureInfo.InvariantCulture);
 
+        stringValue = FindKey(opts, "DefaultMaximumSleepTime", null);
+
+        if (stringValue != null)
+            _defaultMaximumSleepTime = Convert.ToInt32(stringValue, CultureInfo.InvariantCulture);
+
         stringValue = FindKey(opts, "BusyTimeout", null);
 
         if (stringValue != null)
@@ -5034,6 +5076,16 @@ namespace System.Data.SQLite
     {
       get { CheckDisposed(); return _defaultTimeout; }
       set { CheckDisposed(); _defaultTimeout = value; }
+    }
+
+    /// <summary>
+    /// Gets/sets the default maximum sleep time for newly-created commands.
+    /// This can also be set in the ConnectionString with "DefaultMaximumSleepTime"
+    /// </summary>
+    public int DefaultMaximumSleepTime
+    {
+        get { CheckDisposed(); return _defaultMaximumSleepTime; }
+        set { CheckDisposed(); _defaultMaximumSleepTime = value; }
     }
 
     /// <summary>
@@ -5782,19 +5834,26 @@ namespace System.Data.SQLite
       _sql.LogMessage((SQLiteErrorCode)iErrCode, zMessage);
     }
 
-#if INTEROP_CODEC || INTEROP_INCLUDE_SEE
     /// <summary>
-    /// Change the password (or assign a password) to an open database.
+    /// <code>
+    /// WARNING: This method always throws an exception unless the library
+    ///          has been built with encryption support.
+    /// </code>
+    /// Change the password (or assign a password) to the open database.
     /// </summary>
     /// <remarks>
-    /// No readers or writers may be active for this process.  The database must already be open
-    /// and if it already was password protected, the existing password must already have been supplied.
+    /// No readers or writers may be active for this process.  The database
+    /// must already be open and if it already was password protected, the
+    /// existing password must already have been supplied.
     /// </remarks>
-    /// <param name="newPassword">The new password to assign to the database</param>
+    /// <param name="newPassword">
+    /// The new password to assign to the open database.
+    /// </param>
     public void ChangePassword(string newPassword)
     {
         CheckDisposed();
 
+#if INTEROP_CODEC || INTEROP_INCLUDE_SEE
         if (!String.IsNullOrEmpty(newPassword))
         {
             byte[] newPasswordBytes = UTF8Encoding.UTF8.GetBytes(
@@ -5806,35 +5865,65 @@ namespace System.Data.SQLite
         {
             ChangePassword((byte[])null);
         }
+#else
+        throw new SQLiteException(SQLiteErrorCode.Error,
+            "Cannot use \"ChangePassword\" connection method: " +
+            "library was not built with encryption support, please " +
+            "see \"https://www.sqlite.org/see\" for more information");
+#endif
     }
 
     /// <summary>
-    /// Change the password (or assign a password) to an open database.
+    /// <code>
+    /// WARNING: This method always throws an exception unless the library
+    ///          has been built with encryption support.
+    /// </code>
+    /// Change the password (or assign a password) to the open database.
     /// </summary>
     /// <remarks>
-    /// No readers or writers may be active for this process.  The database must already be open
-    /// and if it already was password protected, the existing password must already have been supplied.
+    /// No readers or writers may be active for this process.  The database
+    /// must already be open and if it already was password protected, the
+    /// existing password must already have been supplied.
     /// </remarks>
-    /// <param name="newPassword">The new password to assign to the database</param>
+    /// <param name="newPassword">
+    /// The new password to assign to the open database.
+    /// </param>
     public void ChangePassword(byte[] newPassword)
     {
       CheckDisposed();
 
+#if INTEROP_CODEC || INTEROP_INCLUDE_SEE
       if (_connectionState != ConnectionState.Open)
         throw new InvalidOperationException("Database must be opened before changing the password.");
 
       _sql.ChangePassword(newPassword, _passwordWasText);
+#else
+      throw new SQLiteException(SQLiteErrorCode.Error,
+          "Cannot use \"ChangePassword\" connection method: " +
+          "library was not built with encryption support, please " +
+          "see \"https://www.sqlite.org/see\" for more information");
+#endif
     }
 
     /// <summary>
-    /// Sets the password for a password-protected database.  A password-protected database is
-    /// unusable for any operation until the password has been set.
+    /// <code>
+    /// WARNING: This method always throws an exception unless the library
+    ///          has been built with encryption support.
+    /// </code>
+    /// Sets existing password for a closed password-protected database.
+    /// Password-protected databases are unusable for any other operation
+    /// until the password has been set.  Generally, this is accomplished
+    /// via setting one of the "*Password" connection string properties,
+    /// because it must be done prior to opening the database.
     /// </summary>
-    /// <param name="databasePassword">The password for the database</param>
+    /// <param name="databasePassword">
+    /// The password for the database.
+    /// </param>
     public void SetPassword(string databasePassword)
     {
         CheckDisposed();
 
+#if INTEROP_CODEC || INTEROP_INCLUDE_SEE
         if (!String.IsNullOrEmpty(databasePassword))
         {
             byte[] databasePasswordBytes = UTF8Encoding.UTF8.GetBytes(
@@ -5846,17 +5935,33 @@ namespace System.Data.SQLite
         {
             SetPassword((byte[])null);
         }
+#else
+        throw new SQLiteException(SQLiteErrorCode.Error,
+            "Cannot use \"SetPassword\" connection method: " +
+            "library was not built with encryption support, please " +
+            "see \"https://www.sqlite.org/see\" for more information");
+#endif
     }
 
     /// <summary>
-    /// Sets the password for a password-protected database.  A password-protected database is
-    /// unusable for any operation until the password has been set.
+    /// <code>
+    /// WARNING: This method always throws an exception unless the library
+    ///          has been built with encryption support.
+    /// </code>
+    /// Sets existing password for a closed password-protected database.
+    /// Password-protected databases are unusable for any other operation
+    /// until the password has been set.  Generally, this is accomplished
+    /// via setting one of the "*Password" connection string properties,
+    /// because it must be done prior to opening the database.
     /// </summary>
-    /// <param name="databasePassword">The password for the database</param>
+    /// <param name="databasePassword">
+    /// The password for the database.
+    /// </param>
     public void SetPassword(byte[] databasePassword)
     {
       CheckDisposed();
 
+#if INTEROP_CODEC || INTEROP_INCLUDE_SEE
       if (_connectionState != ConnectionState.Closed)
         throw new InvalidOperationException("Password can only be set before the database is opened.");
 
@@ -5871,8 +5976,13 @@ namespace System.Data.SQLite
       }
 
       _password = databasePassword;
-    }
+#else
+      throw new SQLiteException(SQLiteErrorCode.Error,
+          "Cannot use \"SetPassword\" connection method: " +
+          "library was not built with encryption support, please " +
+          "see \"https://www.sqlite.org/see\" for more information");
 #endif
+    }
 
     /// <summary>
     /// Queries or modifies the number of retries or the retry interval (in milliseconds) for

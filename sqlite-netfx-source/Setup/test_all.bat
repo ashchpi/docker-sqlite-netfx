@@ -18,7 +18,11 @@ REM SET __ECHO2=ECHO
 REM SET __ECHO3=ECHO
 IF NOT DEFINED _AECHO (SET _AECHO=REM)
 IF NOT DEFINED _CECHO (SET _CECHO=REM)
+IF NOT DEFINED _CECHO2 (SET _CECHO2=REM)
+IF NOT DEFINED _CECHO3 (SET _CECHO3=REM)
 IF NOT DEFINED _VECHO (SET _VECHO=REM)
+
+CALL :fn_UnsetVariable BREAK
 
 %_AECHO% Running %0 %*
 
@@ -48,6 +52,7 @@ SET TOOLS=%TOOLS:~0,-1%
 
 CALL :fn_ResetErrorLevel
 
+%_CECHO3% CALL "%TOOLS%\vsSp.bat"
 %__ECHO3% CALL "%TOOLS%\vsSp.bat"
 
 IF ERRORLEVEL 1 (
@@ -55,6 +60,7 @@ IF ERRORLEVEL 1 (
   GOTO errors
 )
 
+%_CECHO3% CALL "%TOOLS%\set_common.bat"
 %__ECHO3% CALL "%TOOLS%\set_common.bat"
 
 IF ERRORLEVEL 1 (
@@ -122,6 +128,7 @@ REM       main loop.  This allows callers to skip 64-bit testing and proceed
 REM       directly to 32-bit testing.
 REM
 IF NOT DEFINED SKIPMAIN (
+  %_CECHO2% PUSHD "%ROOT%"
   %__ECHO2% PUSHD "%ROOT%"
 
   IF ERRORLEVEL 1 (
@@ -247,6 +254,7 @@ IF NOT DEFINED SKIPMAIN (
     )
   )
 
+  %_CECHO2% POPD
   %__ECHO2% POPD
 
   IF ERRORLEVEL 1 (

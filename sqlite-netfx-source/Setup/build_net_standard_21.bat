@@ -12,9 +12,12 @@
 SETLOCAL
 
 REM SET __ECHO=ECHO
+REM SET __ECHO2=ECHO
 REM SET __ECHO3=ECHO
 IF NOT DEFINED _AECHO (SET _AECHO=REM)
 IF NOT DEFINED _CECHO (SET _CECHO=REM)
+IF NOT DEFINED _CECHO2 (SET _CECHO2=REM)
+IF NOT DEFINED _CECHO3 (SET _CECHO3=REM)
 IF NOT DEFINED _VECHO (SET _VECHO=REM)
 
 %_AECHO% Running %0 %*
@@ -83,6 +86,7 @@ REM NOTE: Prevent output files from being wrongly deleted.
 REM
 SET TARGET=Build
 
+%_CECHO3% CALL "%TOOLS%\build_all.bat"
 %__ECHO3% CALL "%TOOLS%\build_all.bat"
 
 IF ERRORLEVEL 1 (
@@ -102,19 +106,6 @@ GOTO no_errors
   SET VALUE=%VALUE:"=%
   REM "
   ENDLOCAL && SET %1=%VALUE%
-  GOTO :EOF
-
-:fn_UnsetVariable
-  SETLOCAL
-  SET VALUE=%1
-  IF DEFINED VALUE (
-    SET VALUE=
-    ENDLOCAL
-    SET %VALUE%=
-  ) ELSE (
-    ENDLOCAL
-  )
-  CALL :fn_ResetErrorLevel
   GOTO :EOF
 
 :fn_ResetErrorLevel
