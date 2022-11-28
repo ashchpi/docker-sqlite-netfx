@@ -13,5 +13,5 @@ RUN cp /usr/src/sqlite-netfx/bin/NetStandard21/ReleaseNetStandard21/bin/netstand
 FROM mcr.microsoft.com/dotnet/aspnet:6.0 AS base
 WORKDIR /usr/lib
 COPY --from=build /usr/src/libSQLite.Interop.so .
-COPY --from=buildnet /usr/src/System.Data.SQLite.dll .
+COPY --from=netbuild /usr/src/System.Data.SQLite.dll .
 RUN ln -s /usr/lib/libSQLite.Interop.so /usr/lib/SQLite.Interop.dll
