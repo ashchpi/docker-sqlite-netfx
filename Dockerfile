@@ -8,7 +8,7 @@ FROM mcr.microsoft.com/dotnet/sdk:2.1 as netbuild
 #sudo ln -s /usr/local/share/dotnet/x64/dotnet /usr/local/bin/
 COPY sqlite-netfx-source /usr/src/sqlite-netfx
 WORKDIR /usr/src/sqlite-netfx/Setup
-RUN sh build-netstandard21-release.sh
+RUN bash build-netstandard21-release.sh
 RUN cp /usr/src/sqlite-netfx/bin/NetStandard21/ReleaseNetStandard21/bin/netstandard2.1/System.Data.SQLite.dll /usr/src/
 
 FROM mcr.microsoft.com/dotnet/aspnet:6.0 AS base
