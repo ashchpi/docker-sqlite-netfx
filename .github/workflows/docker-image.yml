@@ -43,4 +43,4 @@ jobs:
         file: ./Dockerfile 
         platforms: linux/amd64,linux/arm64
         push: true
-        tags: ghcr.io/ashchpi/docker-sqlite-netfx/aspnet:6.117
+        tags: ghcr.io/ashchpi/docker-sqlite-netfx/aspnet:8.118

@@ -776,6 +776,24 @@ namespace System.Data.SQLite
 #endif
 
       /////////////////////////////////////////////////////////////////////////
+
+      /// <summary>
+      /// Determines if retrying a query should be logged.
+      /// </summary>
+      /// <param name="flags">
+      /// The flags associated with the parent connection object.
+      /// </param>
+      /// <returns>
+      /// Non-zero if the query preparation should be logged; otherwise, zero.
+      /// </returns>
+      internal static bool LogRetry(
+          SQLiteConnectionFlags flags
+          )
+      {
+          return HasFlags(flags, SQLiteConnectionFlags.LogRetry);
+      }
+
+      /////////////////////////////////////////////////////////////////////////
       /// <summary>
       /// Determines if the current process is running on one of the Windows
       /// [sub-]platforms.
@@ -2716,7 +2734,7 @@ namespace System.Data.SQLite
       /// The directory for the assembly currently being executed -OR- null if
       /// it cannot be determined.
       /// </returns>
-      private static string GetCachedAssemblyDirectory()
+      public static string GetCachedAssemblyDirectory()
       {
           #region Debug Build Only
 #if DEBUG
@@ -3506,7 +3524,7 @@ namespace System.Data.SQLite
     //       System.Data.SQLite functionality (e.g. being able to bind
     //       parameters and handle column values of types Int64 and Double).
     //
-    internal const string SQLITE_DLL = "SQLite.Interop.117.dll";
+    internal const string SQLITE_DLL = "SQLite.Interop.118.dll";
 #elif SQLITE_STANDARD
     //
     // NOTE: Otherwise, if the standard SQLite library is enabled, use it.
@@ -4050,6 +4068,13 @@ namespace System.Data.SQLite
     [DllImport(SQLITE_DLL)]
 #endif
     internal static extern void sqlite3_interrupt(IntPtr db);
+
+#if !PLATFORM_COMPACTFRAMEWORK
+    [DllImport(SQLITE_DLL, CallingConvention = CallingConvention.Cdecl)]
+#else
+    [DllImport(SQLITE_DLL)]
+#endif
+    internal static extern int sqlite3_is_interrupted(IntPtr db);
 
 #if !PLATFORM_COMPACTFRAMEWORK
     [DllImport(SQLITE_DLL, CallingConvention = CallingConvention.Cdecl)]
@@ -4778,6 +4803,13 @@ namespace System.Data.SQLite
     [DllImport(SQLITE_DLL)]
 #endif
     internal static extern IntPtr sqlite3_mprintf(IntPtr format, __arglist);
+
+#if !PLATFORM_COMPACTFRAMEWORK
+    [DllImport(SQLITE_DLL, CallingConvention = CallingConvention.Cdecl)]
+#else
+    [DllImport(SQLITE_DLL)]
+#endif
+    internal static extern SQLiteTransactionState sqlite3_txn_state(IntPtr db, IntPtr zSchema);
     #endregion
 
     ///////////////////////////////////////////////////////////////////////////

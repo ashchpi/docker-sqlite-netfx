@@ -74,6 +74,10 @@ namespace System.Data.SQLite
     /// </summary>
     internal abstract bool ForceLogPrepare { get; }
     /// <summary>
+    /// Non-zero to log all calls to retry a SQL query.
+    /// </summary>
+    internal abstract bool ForceLogRetry { get; }
+    /// <summary>
     /// Returns the logical list of functions associated with this connection.
     /// </summary>
     internal abstract IDictionary<SQLiteFunctionAttribute, SQLiteFunction> Functions { get; }
@@ -176,6 +180,7 @@ namespace System.Data.SQLite
     /// Prepares a SQL statement for execution.
     /// </summary>
     /// <param name="cnn">The source connection preparing the command.  Can be null for any caller except LINQ</param>
+    /// <param name="command">The source command.</param>
     /// <param name="strSql">The SQL command text to prepare</param>
     /// <param name="previous">The previous statement in a multi-statement command, or null if no previous statement exists</param>
     /// <param name="timeoutMS">The timeout to wait before aborting the prepare</param>
@@ -183,7 +188,7 @@ namespace System.Data.SQLite
     /// SQL up to to either the end of the text or to the first semi-colon delimiter.  The remaining text is returned
     /// here for a subsequent call to Prepare() until all the text has been processed.</param>
     /// <returns>Returns an initialized SQLiteStatement.</returns>
-    internal abstract SQLiteStatement Prepare(SQLiteConnection cnn, string strSql, SQLiteStatement previous, uint timeoutMS, ref string strRemain);
+    internal abstract SQLiteStatement Prepare(SQLiteConnection cnn, SQLiteCommand command, string strSql, SQLiteStatement previous, uint timeoutMS, ref string strRemain);
     /// <summary>
     /// Steps through a prepared statement.
     /// </summary>
@@ -209,6 +214,12 @@ namespace System.Data.SQLite
     /// native database connection.
     /// </summary>
     internal abstract void Cancel();
+
+    /// <summary>
+    /// Returns non-zero if the operation for the current connection has been
+    /// interrupted.
+    /// </summary>
+    internal abstract bool IsCanceled();
 
     /// <summary>
     /// This function binds a user-defined function to the connection.
@@ -493,6 +504,7 @@ namespace System.Data.SQLite
     internal abstract void SetTraceCallback2(SQLiteTraceFlags mask, SQLiteTraceCallback2 func);
     internal abstract void SetRollbackHook(SQLiteRollbackCallback func);
     internal abstract SQLiteErrorCode SetLogCallback(SQLiteLogCallback func);
+    internal abstract SQLiteTransactionState GetTransactionState(string schema);
 
     /// <summary>
     /// Checks if the SQLite core library has been initialized in the current process.
@@ -1539,6 +1551,12 @@ namespace System.Data.SQLite
       StopOnException = 0x4000000000000,
 
       /// <summary>
+      /// Enable logging of internal retries during statment preparation
+      /// and stepping.
+      /// </summary>
+      LogRetry = 0x8000000000000,
+
+      /// <summary>
       /// When binding parameter values or returning column values, always
       /// treat them as though they were plain text (i.e. no numeric,
       /// date/time, or other conversions should be attempted).
@@ -1586,11 +1604,11 @@ namespace System.Data.SQLite
       /// Enable all logging.
       /// </summary>
 #if INTEROP_VIRTUAL_TABLE
-      LogAll = LogPrepare | LogPreBind | LogBind |
+      LogAll = LogRetry | LogPrepare | LogPreBind | LogBind |
                LogCallbackException | LogBackup | LogModuleError |
                LogModuleException,
 #else
-      LogAll = LogPrepare | LogPreBind | LogBind |
+      LogAll = LogRetry | LogPrepare | LogPreBind | LogBind |
                LogCallbackException | LogBackup,
 #endif
 
@@ -1900,7 +1918,28 @@ namespace System.Data.SQLite
       /// setting can also be controlled using the PRAGMA trusted_schema
       /// statement.
       /// </summary>
-      SQLITE_DBCONFIG_TRUSTED_SCHEMA = 1017 // int int*
+      SQLITE_DBCONFIG_TRUSTED_SCHEMA = 1017, // int int*
+
+      /// <summary>
+      /// This option is only useful in SQLITE_ENABLE_STMT_SCANSTATUS builds.
+      /// In this case, it sets or clears a flag that enables collection of
+      /// the sqlite3_stmt_scanstatus_v2() statistics. For statistics to be
+      /// collected, the flag must be set on the database handle both when
+      /// the SQL statement is prepared and when it is stepped. The flag is
+      /// set (collection of statistics is enabled) by default.
+      /// </summary>
+      SQLITE_DBCONFIG_STMT_SCANSTATUS = 1018, // int int*
+
+      /// <summary>
+      /// The SQLITE_DBCONFIG_REVERSE_SCANORDER option change the default
+      /// order in which tables and indexes are scanned so that the scans
+      /// start at the end and work toward the beginning rather than
+      /// starting at the beginning and working toward the end.  Setting
+      /// SQLITE_DBCONFIG_REVERSE_SCANORDER is the same as setting [PRAGMA
+      /// reverse_unordered_selects].  This configuration option is useful
+      /// for application testing.
+      /// </summary>
+      SQLITE_DBCONFIG_REVERSE_SCANORDER = 1019 // int int*
   }
 
   // These are the options to the internal sqlite3_config call.
@@ -1935,7 +1974,18 @@ namespace System.Data.SQLite
     SQLITE_CONFIG_STMTJRNL_SPILL = 26, // int nByte
     SQLITE_CONFIG_SMALL_MALLOC = 27, // boolean
     SQLITE_CONFIG_SORTERREF_SIZE = 28, // int nByte
-    SQLITE_CONFIG_MEMDB_MAXSIZE = 29  // sqlite3_int64
+    SQLITE_CONFIG_MEMDB_MAXSIZE = 29 // sqlite3_int64
+  }
+
+  /// <summary>
+  /// These constants are returned by the sqlite3_txn_state() API.
+  /// </summary>
+  internal enum SQLiteTransactionState
+  {
+      SQLITE_TXN_UNKNOWN = -1,
+      SQLITE_TXN_NONE = 0,
+      SQLITE_TXN_READ = 1,
+      SQLITE_TXN_WRITE = 2
   }
 
   /// <summary>
@@ -1943,13 +1993,48 @@ namespace System.Data.SQLite
   /// callbacks registered by it.
   /// </summary>
   [Flags()]
-  internal enum SQLiteTraceFlags
+  public enum SQLiteTraceFlags
   {
+      /// <summary>
+      /// This value represents a mask where no trace events should be
+      /// generated.
+      /// </summary>
       SQLITE_TRACE_NONE = 0x0, // nil
+
+      /// <summary>
+      /// The trace event invoked when a prepared statement first begins
+      /// running and possibly at other times during the execution of
+      /// the prepared statement, such as at the start of each trigger
+      /// subprogram.
+      /// </summary>
       SQLITE_TRACE_STMT = 0x1, // pStmt, zSql
+
+      /// <summary>
+      /// The trace event invoked when a prepared statement finishes.
+      /// It provides a 64-bit integer which is the estimated of the
+      /// number of nanosecond that the prepared statement took to run.
+      /// </summary>
       SQLITE_TRACE_PROFILE = 0x2, // pStmt, piNsec64
+
+      /// <summary>
+      /// The trace event invoked when a prepared statement generates
+      /// a single row of result.
+      /// </summary>
       SQLITE_TRACE_ROW = 0x4, // pStmt
-      SQLITE_TRACE_CLOSE = 0x8 // pDb
+
+      /// <summary>
+      /// The trace event invoked when a database connection closes.
+      /// </summary>
+      SQLITE_TRACE_CLOSE = 0x8, // pDb
+
+      /// <summary>
+      /// This value represents a mask where all supported trace events
+      /// should be generated.  This value is subject to change, e.g.
+      /// when additional trace events are added by the SQLite core
+      /// library.
+      /// </summary>
+      SQLITE_TRACE_ALL = SQLITE_TRACE_STMT | SQLITE_TRACE_PROFILE |
+                         SQLITE_TRACE_ROW | SQLITE_TRACE_CLOSE,
   }
 
   /// <summary>

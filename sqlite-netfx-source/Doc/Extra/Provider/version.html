@@ -43,6 +43,18 @@
     <div id="mainSection">
     <div id="mainBody">
     <h1 class="heading">Version History</h1>
+    <p><b>1.0.118.0 - June 10, 2023</b></p>
+    <ul>
+      <li>Updated to <a href="https://www.sqlite.org/releaselog/3_42_0.html">SQLite 3.42.0</a>.</li>
+      <li>Add the ConnectionStringPreview, SqlStringPreview, and Canceled connection events.</li>
+      <li>Add support for the sqlite3_is_interrupted core library API. Pursuant to forum post <a href="https://www.sqlite.org/forum/forumpost/b6a707bffb">[b6a707bffb]</a>.</li>
+      <li>Add support for the sqlite_trace_v2 core library API. Pursuant to forum post <a href="https://www.sqlite.org/forum/forumpost/1c418d7edc">[1c418d7edc]</a>.</li>
+      <li>Add TextHexPassword connection string property for use with <a href="https://www.sqlite.org/see">SEE</a>.</li>
+      <li>Add SQLite_ForceLogRetry environment variable to force logging of all internal retries during statment preparation and stepping.</li>
+      <li>Add StepRetries connection string property to allow the maximum number of retries when stepping a query to be overridden.</li>
+      <li>Fix ExecuteScalar and ExecuteNonQuery handling of write transactions that require more than one call to step. Pursuant to forum post <a href="https://www.sqlite.org/forum/forumpost/f4e718891d">[f4e718891d]</a>.&nbsp;<b>** Potentially Incompatible Change **</b></li>
+      <li>Parameter names should be case-sensitive. Fix for <a href="https://system.data.sqlite.org/index.html/info/e22d357a21">[e22d357a21]</a>.&nbsp;<b>** Potentially Incompatible Change **</b></li>
+    </ul>
     <p><b>1.0.117.0 - November 28, 2022</b></p>
     <ul>
       <li>Updated to <a href="https://www.sqlite.org/releaselog/3_40_0.html">SQLite 3.40.0</a>.</li>

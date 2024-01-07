@@ -1052,22 +1052,22 @@ namespace eval ::Eagle {
         #       1. Build the separate managed and native assemblies using some
         #          commands similar to:
         #
-        #          build.bat ${Configuration}ManagedOnly ${Platform}
-        #          build.bat ${Configuration}NativeOnly ${Platform}
+        #          CALL build.bat ${Configuration}ManagedOnly ${Platform}
+        #          CALL build.bat ${Configuration}NativeOnly ${Platform}
         #
         #          Where ${Configuration} is either "Debug" or "Release" and
         #          ${Platform} is either "Win32" or "x64".
         #
         #       2. Build the mixed-mode assembly using a command similar to:
         #
-        #          build.bat ${Configuration} ${Platform}
+        #          CALL build.bat ${Configuration} ${Platform}
         #
         #          Where ${Configuration} is either "Debug" or "Release" and
         #          ${Platform} is either "Win32" or "x64".  If this command is
         #          used, various tests that require supplementary managed
         #          assemblies (e.g. LINQ) may be skipped unless those binaries
         #          are subsequently copied into the correct directory (i.e. by
-        #          "test_all.bat").
+        #          "CALL test_all.bat").
         #
         #       Note that all of the build commands above will default to using
         #       the latest version of MSBuild available and the "test_year" may
@@ -1838,28 +1838,32 @@ namespace eval ::Eagle {
       }
     }
 
-    proc tryLoadAssembly { fileName {platform ""} } {
+    proc tryLoadAssembly { fileName {platform ""} {initialize ""} } {
       set fileName [getBinaryFileName $fileName $platform]
 
       if {[catch {
         set assembly [object load -loadtype File -alias $fileName]
       }] == 0} then {
-        #
-        # NOTE: Now, add the necessary test constraint.
-        #
-        addConstraint [file rootname [file tail $fileName]]
+        if {[string length $initialize] == 0 || \
+            [catch $initialize] == 0} then {
+          #
+          # NOTE: Now, add the necessary test constraint.
+          #
+          addConstraint [file rootname [file tail $fileName]]
 
-        #
-        # NOTE: Grab the image runtime version from the assembly because
-        #       several tests rely on it having a certain value.
-        #
-        addConstraint [appendArgs [file tail $fileName] _ \
-            [$assembly ImageRuntimeVersion]]
+          #
+          # NOTE: Grab the image runtime version from the assembly
+          #       because several tests rely on it having a certain
+          #       value.
+          #
+          addConstraint [appendArgs [file tail $fileName] _ \
+              [$assembly ImageRuntimeVersion]]
 
-        #
-        # NOTE: Return the full path of the loaded file.
-        #
-        return $fileName
+          #
+          # NOTE: Return the full path of the loaded file.
+          #
+          return $fileName
+        }
       }
 
       return ""
@@ -3353,7 +3357,8 @@ namespace eval ::Eagle {
       # NOTE: Add the name of the current test file, if available.  This is
       #       only used for debugging.
       #
-      if {[info exists ::test_file]} then {
+      if {[info exists ::test_file] && \
+          [string length $::test_file] > 0} then {
         append connection {;TestFile=${::test_file}}
       }
 
@@ -3361,7 +3366,8 @@ namespace eval ::Eagle {
       # NOTE: Add the name of the current test, if available.  This is only
       #       used for debugging.
       #
-      if {[info exists ::eagle_tests(CurrentName)]} then {
+      if {[info exists ::eagle_tests(CurrentName)] && \
+          [string length $::eagle_tests(CurrentName)] > 0} then {
         append connection {;TestName=${::eagle_tests(CurrentName)}}
       }
 
@@ -4339,8 +4345,8 @@ namespace eval ::Eagle {
         }
 
         #
-        # BUGFIX: Before calling the native shutdown function, make sure both
-        #         of the PRAGMA related directory names are freed.
+        # BUGFIX: Before calling the native shutdown function, make sure
+        #         both of the PRAGMA related directory names are freed.
         #
         checkForSQLiteDirectories $channel true
 
@@ -4402,6 +4408,58 @@ namespace eval ::Eagle {
       }
 
       return -1
+    }
+
+    proc getCreateCount {} {
+      if {[isDotNetCore]} then {
+        if {[catch {
+          #
+          # TODO: For reasons that are unclear, this next command will
+          #       sometimes fail when running on .NET Core 2.x.
+          #
+          object invoke -flags +NonPublic \
+              "System.Data.SQLite.SQLiteBase, System.Data.SQLite" \
+              _createCount
+        } result] == 0} then {
+          return $result
+        }
+      }
+
+      if {[catch {
+        object invoke -flags +NonPublic [appendArgs \
+            "System.Data.SQLite.SQLiteBase, " [lindex [object \
+            load System.Data.SQLite] 0]] _createCount
+      } result] == 0} then {
+        return $result
+      }
+
+      error "could not figure out how to obtain create count"
+    }
+
+    proc getDisposeCount {} {
+      if {[isDotNetCore]} then {
+        if {[catch {
+          #
+          # TODO: For reasons that are unclear, this next command will
+          #       sometimes fail when running on .NET Core 2.x.
+          #
+          object invoke -flags +NonPublic \
+              "System.Data.SQLite.SQLiteBase, System.Data.SQLite" \
+              _disposeCount
+        } result] == 0} then {
+          return $result
+        }
+      }
+
+      if {[catch {
+        object invoke -flags +NonPublic [appendArgs \
+            "System.Data.SQLite.SQLiteBase, " [lindex [object \
+            load System.Data.SQLite] 0]] _disposeCount
+      } result] == 0} then {
+        return $result
+      }
+
+      error "could not figure out how to obtain dispose count"
     }
 
     proc getOtherCount { name } {
@@ -4968,6 +5026,54 @@ namespace eval ::Eagle {
       }
     }
 
+    proc resetSQLiteLogSubsystem {
+            channel {shutdown false} {initialize true} } {
+      if {[catch {
+        object invoke -flags +NonPublic System.Data.SQLite.SQLiteLog \
+            Uninitialize [getTestSuite] $shutdown
+
+        if {$shutdown} then {
+          #
+          # HACK: Just in case the internal SQLite database handle in
+          #       the SQLiteLog class was unavailable, perform a clean
+          #       shutdown of the SQLite core library now.
+          #
+          shutdownSQLite $channel
+        }
+
+        object invoke -flags +NonPublic System.Data.SQLite.SQLiteLog \
+            _initializeDoneCount 0
+
+        object invoke -flags +NonPublic System.Data.SQLite.SQLiteLog \
+            _attemptedInitialize 0
+
+        if {$initialize} then {
+          object invoke -flags +NonPublic System.Data.SQLite.SQLiteLog \
+              Initialize [getTestSuite]
+        }
+      } error] == 0} then {
+        tputs $channel [appendArgs \
+            "---- success resetting internal SQLiteLog state to " \
+            [expr {$initialize ? "initialized" : "uninitialized"}] \n]
+      } else {
+        tputs $channel [appendArgs \
+            "---- failure resetting internal SQLiteLog state to " \
+            [expr {$initialize ? "initialized" : "uninitialized"}] \
+            ", error: " \n\t $error \n]
+      }
+    }
+
+    proc addTraceListenerForTestLogFile { channel } {
+      if {[info exists ::test_log] && [file exists $::test_log]} then {
+        debug trace -log true -logname [getTestSuite] -logfilename \
+            $::test_log; # throw
+
+        tputs $channel [appendArgs \
+            "---- copying trace listener output to test log file \"" \
+            $::test_log \"...\n]
+      }
+    }
+
     proc moveTestLogFile { path } {
       if {[info exists ::test_log] && [file exists $::test_log]} then {
         set old_test_log $::test_log
@@ -5186,6 +5292,21 @@ namespace eval ::Eagle {
         #       test settings now.
         #
         uplevel 1 [list loadSQLiteTestSettings $::test_channel .before]
+
+        #
+        # NOTE: Check for TLS protocol support, e.g. TLS 1.2, etc.
+        #
+        checkForTlsOk \
+            $::test_channel [list system.data.sqlite.org] $::test_timeout
+
+        if {[haveConstraint tlsOk]} then {
+          addConstraint sdsTlsOk
+        }
+
+        #
+        # NOTE: Check for "reasonably" fast timing precision.
+        #
+        checkForTiming $::test_channel 25 sdsTiming; # 1/40th second.
 
         #
         # NOTE: Show (and log) the global parameters that control where the
@@ -5507,6 +5628,14 @@ namespace eval ::Eagle {
           moveTestLogFile $logDirectory
 
           #
+          # NOTE: If requested, redirect captured trace listener output
+          #       to the test log file.
+          #
+          if {[hasRuntimeOption traceToTestLogFile]} then {
+            addTraceListenerForTestLogFile $::test_channel
+          }
+
+          #
           # NOTE: Skip trying to copy any files if instructed.
           #
           if {![info exists ::no(copySqliteFiles)]} then {
@@ -5681,7 +5810,14 @@ namespace eval ::Eagle {
           #
           if {![info exists ::no(loadSqliteFiles)]} then {
             if {![info exists ::no(loadSqliteImplicitFiles)]} then {
-              tryLoadAssembly System.Data.SQLite.dll
+              tryLoadAssembly System.Data.SQLite.dll "" {
+                if {![info exists \
+                    ::no(initializeSqliteImplicitFiles)]} then {
+                  object invoke -flags +NonPublic \
+                      System.Data.SQLite.UnsafeNativeMethods \
+                      Initialize
+                }
+              }
             }
 
             if {![info exists ::no(loadSqliteLinqFiles)]} then {
@@ -5695,12 +5831,26 @@ namespace eval ::Eagle {
             if {![info exists ::no(loadSqliteNonImplicitFiles)]} then {
               if {![info exists ::no(loadSqlitePlatformFiles)] && \
                   [string length $platform] > 0} then {
-                tryLoadAssembly System.Data.SQLite.dll $platform
+                tryLoadAssembly System.Data.SQLite.dll $platform {
+                  if {![info exists \
+                      ::no(initializeSqlitePlatformFiles)]} then {
+                    object invoke -flags +NonPublic \
+                        System.Data.SQLite.UnsafeNativeMethods \
+                        Initialize
+                  }
+                }
               }
 
               if {![info exists ::no(loadSqliteArchitectureFiles)] && \
                   [string length $architecture] > 0} then {
-                tryLoadAssembly System.Data.SQLite.dll $architecture
+                tryLoadAssembly System.Data.SQLite.dll $architecture {
+                  if {![info exists \
+                      ::no(initializeSqliteArchitectureFiles)]} then {
+                    object invoke -flags +NonPublic \
+                        System.Data.SQLite.UnsafeNativeMethods \
+                        Initialize
+                  }
+                }
               }
             }
           }

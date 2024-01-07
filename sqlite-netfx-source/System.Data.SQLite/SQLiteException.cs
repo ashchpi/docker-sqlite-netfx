@@ -37,6 +37,10 @@ namespace System.Data.SQLite
 
     ///////////////////////////////////////////////////////////////////////////
 
+    /// <summary>
+    /// This field contains the SQLite (or Win32?) error code associated
+    /// with this exception.
+    /// </summary>
     private SQLiteErrorCode _errorCode;
 
     ///////////////////////////////////////////////////////////////////////////
@@ -52,11 +56,12 @@ namespace System.Data.SQLite
     /// Contains contextual information about the source or destination.
     /// </param>
     private SQLiteException(SerializationInfo info, StreamingContext context)
-      : base(info, context)
+        : base(info, context)
     {
-      _errorCode = (SQLiteErrorCode)info.GetInt32("errorCode");
+        _errorCode = (SQLiteErrorCode)MaybeMutateErrorCode(
+            info.GetInt32("errorCode"));
 
-      Initialize();
+        Initialize();
     }
 #endif
 
@@ -73,11 +78,11 @@ namespace System.Data.SQLite
     /// Message text to go along with the return code message text.
     /// </param>
     public SQLiteException(SQLiteErrorCode errorCode, string message)
-      : base(GetStockErrorMessage(errorCode, message))
+        : base(GetStockErrorMessage(MaybeMutateErrorCode(errorCode), message))
     {
-      _errorCode = errorCode;
+        _errorCode = MaybeMutateErrorCode(errorCode);
 
-      Initialize();
+        Initialize();
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -186,7 +191,12 @@ namespace System.Data.SQLite
     {
         if (HResult == unchecked((int)0x80004005)) /* E_FAIL */
         {
-            int? localHResult = GetHResultForErrorCode(ResultCode);
+            int? localHResult;
+
+            if (ErrorCode < 0) /* FAILED(hResult) */
+                localHResult = ErrorCode; /* hResult */
+            else
+                localHResult = GetHResultForErrorCode(ResultCode);
 
             if (localHResult != null)
                 HResult = (int)localHResult;
@@ -213,8 +223,68 @@ namespace System.Data.SQLite
         bool success
         )
     {
-        return (errorCode & 0xFFFF) | FACILITY_SQLITE |
+        return (errorCode & ushort.MaxValue) | (FACILITY_SQLITE << 16) |
             (success ? 0 : unchecked((int)0x80000000));
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+
+    /// <summary>
+    /// Determines if an integer error code is really a failure HRESULT.
+    /// If so, extracts the error code from it; otherwise, returns the
+    /// value verbatim.
+    /// </summary>
+    /// <param name="value">
+    /// Either a failure HRESULT or a Win32 error code.
+    /// </param>
+    /// <returns>
+    /// Either an extracted Win32 error code -OR- the origianl value
+    /// verbatim.
+    /// </returns>
+    private static int MaybeMutateErrorCode(
+        int value
+        )
+    {
+        return (value < 0) ? GetErrorCodeForHResult(value) : value;
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+
+    /// <summary>
+    /// Determines if an integer error code is really a failure HRESULT.
+    /// If so, extracts the error code from it; otherwise, returns the
+    /// value verbatim.
+    /// </summary>
+    /// <param name="value">
+    /// Either a failure HRESULT or a Win32 error code.
+    /// </param>
+    /// <returns>
+    /// Either an extracted Win32 error code -OR- the origianl value
+    /// verbatim.
+    /// </returns>
+    private static SQLiteErrorCode MaybeMutateErrorCode(
+        SQLiteErrorCode value
+        )
+    {
+        return (SQLiteErrorCode)MaybeMutateErrorCode((int)value);
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+
+    /// <summary>
+    /// Maps an HRESULT to a Win32 error code.
+    /// </summary>
+    /// <param name="hResult">
+    /// The specified HRESULT.
+    /// </param>
+    /// <returns>
+    /// The integer value of the Win32 error code.
+    /// </returns>
+    private static int GetErrorCodeForHResult(
+        int hResult
+        )
+    {
+        return (hResult & ushort.MaxValue);
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -872,6 +942,11 @@ namespace System.Data.SQLite
       /// Pages were recovered from the journal file.
       /// </summary>
       Notice_Recover_Rollback = (Notice | (2 << 8)),
+      /// <summary>
+      /// May be returned for spurious errors that can occur when applying
+      /// an RBU update.
+      /// </summary>
+      Notice_Rbu = (Notice | (3 << 8)),
       /// <summary>
       /// An automatic index was created to process a query.
       /// </summary>

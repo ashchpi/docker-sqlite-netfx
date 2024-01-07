@@ -340,6 +340,28 @@ namespace System.Data.SQLite
     }
 
     /// <summary>
+    /// Gets/sets the maximum number of retries when stepping SQL to be executed.
+    /// This normally only applies to stepping errors resulting from the database
+    /// being locked.
+    /// </summary>
+    [DisplayName("Step Retries")]
+    [Browsable(true)]
+    [DefaultValue(40)]
+    public int StepRetries
+    {
+        get
+        {
+            object value;
+            TryGetValue("stepretries", out value);
+            return Convert.ToInt32(value, CultureInfo.CurrentCulture);
+        }
+        set
+        {
+            this["stepretries"] = value;
+        }
+    }
+
+    /// <summary>
     /// Gets/sets the approximate number of virtual machine instructions between
     /// progress events.  In order for progress events to actually fire, the event
     /// handler must be added to the <see cref="SQLiteConnection.Progress" /> event
@@ -514,6 +536,35 @@ namespace System.Data.SQLite
         set
         {
             this["textpassword"] = value;
+        }
+    }
+
+    /// <summary>
+    /// Gets/sets the database encryption textual password in hexadecimal
+    /// </summary>
+    [DisplayName("Textual Hexadecimal Password")]
+    [Browsable(true)]
+    [PasswordPropertyText(true)]
+    [DefaultValue(null)]
+    public byte[] TextHexPassword
+    {
+        get
+        {
+            object value;
+
+            if (TryGetValue("texthexpassword", out value))
+            {
+                if (value is string)
+                    return SQLiteConnection.FromHexString((string)value);
+                else if (value != null)
+                    return (byte[])value;
+            }
+
+            return null;
+        }
+        set
+        {
+            this["texthexpassword"] = SQLiteConnection.ToHexString(value);
         }
     }
 

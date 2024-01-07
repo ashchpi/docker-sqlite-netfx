@@ -11,7 +11,7 @@ RUN bash build-netstandard21-release.sh
 RUN cp /usr/src/sqlite-netfx/bin/NetStandard21/ReleaseNetStandard21/bin/netstandard2.1/System.Data.SQLite.dll /usr/src/
 RUN cp /usr/src/sqlite-netfx/bin/NetStandard21/ReleaseNetStandard21/bin/netstandard2.1/System.Data.SQLite.EF6.dll /usr/src/
 
-FROM mcr.microsoft.com/dotnet/aspnet:6.0 AS base
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 WORKDIR /usr/lib
 COPY --from=build /usr/src/libSQLite.Interop.so .
 COPY --from=netbuild /usr/src/System.Data.SQLite.dll .

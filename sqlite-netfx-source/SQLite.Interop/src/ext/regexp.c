@@ -595,7 +595,7 @@ static const char *re_subcompile_string(ReCompiled *p){
         break;
       }
       case '[': {
-        int iFirst = p->nState;
+        unsigned int iFirst = p->nState;
         if( rePeek(p)=='^' ){
           re_append(p, RE_OP_CC_EXC, 0);
           p->sIn.i++;
@@ -619,7 +619,7 @@ static const char *re_subcompile_string(ReCompiled *p){
           if( rePeek(p)==']' ){ p->sIn.i++; break; }
         }
         if( c==0 ) return "unclosed '['";
-        p->aArg[iFirst] = p->nState - iFirst;
+        if( p->nState>iFirst ) p->aArg[iFirst] = p->nState - iFirst;
         break;
       }
       case '\\': {
@@ -803,6 +803,7 @@ static void re_bytecode_func(
   int i;
   int n;
   char *z;
+  (void)argc;
 
   zPattern = (const char*)sqlite3_value_text(argv[0]);
   if( zPattern==0 ) return;

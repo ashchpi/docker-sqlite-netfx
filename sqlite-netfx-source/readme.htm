@@ -5,8 +5,8 @@
 </head>
 <body>
 ADO.NET SQLite Data Provider<br />
-Version 1.0.117.0 - November 28, 2022<br />
-Using <a href="https://www.sqlite.org/releaselog/3_40_0.html">SQLite 3.40.0</a><br />Originally written by Robert Simpson<br />
+Version 1.0.118.0 - June 10, 2023<br />
+Using <a href="https://www.sqlite.org/releaselog/3_42_0.html">SQLite 3.42.0</a><br />Originally written by Robert Simpson<br />
 Released to the public domain, use at your own risk!<br />
 Official provider website:&nbsp;<a href="https://system.data.sqlite.org/">https://system.data.sqlite.org/</a><br />
 Legacy versions:&nbsp;<a href="https://sourceforge.net/projects/sqlite-dotnet2/">https://sourceforge.net/projects/sqlite-dotnet2/</a><br />
@@ -145,7 +145,7 @@ app.config file:<br />
         &lt;DbProviderFactories&gt;
             &lt;remove invariant="System.Data.SQLite" /&gt;
             &lt;add name="SQLite Data Provider" invariant="System.Data.SQLite" description=".NET Framework Data Provider for SQLite"
-                 type="System.Data.SQLite.SQLiteFactory, System.Data.SQLite, Version=1.0.117.0, Culture=neutral, PublicKeyToken=db937bc2d44ff139" /&gt;
+                 type="System.Data.SQLite.SQLiteFactory, System.Data.SQLite, Version=1.0.118.0, Culture=neutral, PublicKeyToken=db937bc2d44ff139" /&gt;
         &lt;/DbProviderFactories&gt;
     &lt;/system.data&gt;
 &lt;/configuration&gt;
@@ -207,6 +207,20 @@ released versions of System.Data.SQLite.
 
 <h2><b>Version History</b></h2>
 
+<p>
+    <b>1.0.118.0 - June 10, 2023</b>
+</p>
+<ul>
+    <li>Updated to <a href="https://www.sqlite.org/releaselog/3_42_0.html">SQLite 3.42.0</a>.</li>
+    <li>Add the ConnectionStringPreview, SqlStringPreview, and Canceled connection events.</li>
+    <li>Add support for the sqlite3_is_interrupted core library API. Pursuant to forum post [b6a707bffb].</li>
+    <li>Add support for the sqlite_trace_v2 core library API. Pursuant to forum post [1c418d7edc].</li>
+    <li>Add TextHexPassword connection string property for use with <a href="https://www.sqlite.org/see">SEE</a>.</li>
+    <li>Add SQLite_ForceLogRetry environment variable to force logging of all internal retries during statment preparation and stepping.</li>
+    <li>Add StepRetries connection string property to allow the maximum number of retries when stepping a query to be overridden.</li>
+    <li>Fix ExecuteScalar and ExecuteNonQuery handling of write transactions that require more than one call to step. Pursuant to forum post [f4e718891d].&nbsp;<b>** Potentially Incompatible Change **</b></li>
+    <li>Parameter names should be case-sensitive. Fix for [e22d357a21].&nbsp;<b>** Potentially Incompatible Change **</b></li>
+</ul>
 <p>
     <b>1.0.117.0 - November 28, 2022</b>
 </p>

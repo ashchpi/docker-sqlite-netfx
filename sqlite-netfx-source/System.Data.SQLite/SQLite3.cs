@@ -67,7 +67,7 @@ namespace System.Data.SQLite
         "d8215c18a4349a436dd499e3c385cc683015f886f6c10bd90115eb2bd61b67750839e3a19941dc9c";
 
 #if !PLATFORM_COMPACTFRAMEWORK
-    internal const string DesignerVersion = "1.0.117.0";
+    internal const string DesignerVersion = "1.0.118.0";
 #endif
 
     /// <summary>
@@ -121,13 +121,20 @@ namespace System.Data.SQLite
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    #region Query Preparation Diagnostics Support
+    #region Query Diagnostics Support
     /// <summary>
     /// This field is used to keep track of whether or not the
     /// "SQLite_ForceLogPrepare" environment variable has been queried.  If so,
     /// it will only be non-zero if the environment variable was present.
     /// </summary>
     private bool _forceLogPrepare;
+
+    /// <summary>
+    /// This field is used to keep track of whether or not the
+    /// "SQLite_ForceLogRetry" environment variable has been queried.  If so,
+    /// it will only be non-zero if the environment variable was present.
+    /// </summary>
+    private bool _forceLogRetry;
     #endregion
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -169,6 +176,7 @@ namespace System.Data.SQLite
       : base(fmt, kind, fmtString)
     {
         InitializeForceLogPrepare();
+        InitializeForceLogRetry();
 
         SQLiteConnectionPool.CreateAndInitialize(
             null, UnsafeNativeMethods.GetSettingValue(
@@ -190,7 +198,7 @@ namespace System.Data.SQLite
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    #region Query Preparation Diagnostics Support
+    #region Query Diagnostics Support
     /// <summary>
     /// Determines if all calls to prepare a SQL query will be logged,
     /// regardless of the flags for the associated connection.
@@ -213,6 +221,32 @@ namespace System.Data.SQLite
     internal override bool ForceLogPrepare
     {
         get { return _forceLogPrepare; }
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    /// <summary>
+    /// Determines if all calls to retry a SQL query will be logged,
+    /// regardless of the flags for the associated connection.
+    /// </summary>
+    private void InitializeForceLogRetry()
+    {
+        if (UnsafeNativeMethods.GetSettingValue(
+                "SQLite_ForceLogRetry", null) != null)
+        {
+            _forceLogRetry = true;
+        }
+        else
+        {
+            _forceLogRetry = false;
+        }
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    internal override bool ForceLogRetry
+    {
+        get { return _forceLogRetry; }
     }
     #endregion
 
@@ -337,7 +371,7 @@ namespace System.Data.SQLite
           if (_returnToPool || _usePool)
           {
               if (SQLiteBase.ResetConnection(_sql, _sql, !disposing) &&
-                  UnhookNativeCallbacks(true, !disposing))
+                  UnhookNativeCallbacks(true, true, !disposing))
               {
                   if (unbindFunctions)
                   {
@@ -403,7 +437,7 @@ namespace System.Data.SQLite
           else
           {
               /* IGNORED */
-              UnhookNativeCallbacks(disposing, !disposing);
+              UnhookNativeCallbacks(false, disposing, !disposing);
 
               if (unbindFunctions)
               {
@@ -509,6 +543,17 @@ namespace System.Data.SQLite
         Interlocked.Increment(ref _cancelCount);
         UnsafeNativeMethods.sqlite3_interrupt(_sql);
       }
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    /// <summary>
+    /// Returns non-zero if the operation for the current connection has been
+    /// interrupted.
+    /// </summary>
+    internal override bool IsCanceled()
+    {
+        return UnsafeNativeMethods.sqlite3_is_interrupted(_sql) != 0;
     }
 
     /// <summary>
@@ -1203,9 +1248,14 @@ namespace System.Data.SQLite
     {
       SQLiteErrorCode n;
       Random rnd = null;
+      int schemaRetries = 0;
+      int lockRetries = 0;
+      int sleeps = 0;
+      int maximumRetries = SQLiteCommand.GetStepRetries(stmt._command);
       uint starttick = (uint)Environment.TickCount;
       uint timeout = (uint)(stmt._command._commandTimeout * 1000);
       int maximumSleepTime = stmt._command._maximumSleepTime;
+      SQLiteConnectionFlags flags = SQLiteCommand.GetFlags(stmt._command);
 
       ResetCancelCount();
 
@@ -1238,6 +1288,29 @@ namespace System.Data.SQLite
 
         if (n != SQLiteErrorCode.Ok)
         {
+          if (n == SQLiteErrorCode.Schema)
+          {
+            schemaRetries++;
+
+            if ((maximumRetries >= 0) && (schemaRetries > maximumRetries))
+              throw new SQLiteException(n, GetLastError());
+
+            stmt._stepSchemaRetries++;
+          }
+          else if (n == SQLiteErrorCode.Locked || n == SQLiteErrorCode.Busy)
+          {
+            lockRetries++;
+
+            if ((maximumRetries >= 0) && (lockRetries > maximumRetries))
+              throw new SQLiteException(n, GetLastError());
+
+            stmt._stepLockRetries++;
+          }
+          else
+          {
+            throw new SQLiteException(n, GetLastError());
+          }
+
           SQLiteErrorCode r;
 
           // An error occurred, attempt to reset the statement.  If the reset worked because the
@@ -1246,8 +1319,9 @@ namespace System.Data.SQLite
           r = Reset(stmt);
 
           if (r == SQLiteErrorCode.Ok)
+          {
             throw new SQLiteException(n, GetLastError());
-
+          }
           else if ((r == SQLiteErrorCode.Locked || r == SQLiteErrorCode.Busy) && stmt._command != null)
           {
             // Keep trying
@@ -1261,9 +1335,31 @@ namespace System.Data.SQLite
             }
             else
             {
+              int sleepMs = rnd.Next(1, maximumSleepTime);
+
+              if (_forceLogRetry || HelperMethods.LogRetry(flags))
+              {
+                  string logSql = stmt._sqlStatement;
+
+                  if ((logSql == null) || (logSql.Length == 0) || (logSql.Trim().Length == 0))
+                      logSql = "<nothing>";
+
+                  SQLiteLog.LogMessage(HelperMethods.StringFormat(
+                      CultureInfo.CurrentCulture, "Will retry {0} ==> {1} step #{2}, #{3} after {4}ms ({5}): {{{6}}}",
+                      n, r, schemaRetries, lockRetries, sleepMs, sleeps, logSql));
+              }
+
               // Otherwise sleep for a random amount of time up to Xms
-              System.Threading.Thread.Sleep(rnd.Next(1, maximumSleepTime));
+              System.Threading.Thread.Sleep(sleepMs);
+              sleeps++;
             }
+          }
+          else
+          {
+            //
+            // TODO: Can this actually be hit?
+            //
+            throw new SQLiteException(r, GetLastError());
           }
         }
       }
@@ -1368,7 +1464,7 @@ namespace System.Data.SQLite
       {
         // Recreate a dummy statement
         string str = null;
-        using (SQLiteStatement tmp = Prepare(null, stmt._sqlStatement, null, (uint)(stmt._command._commandTimeout * 1000), ref str))
+        using (SQLiteStatement tmp = Prepare(null, stmt._command, stmt._sqlStatement, null, (uint)(stmt._command._commandTimeout * 1000), ref str))
         {
           // Finalize the existing statement
           stmt._sqlite_stmt.Dispose();
@@ -1450,7 +1546,7 @@ namespace System.Data.SQLite
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    internal override SQLiteStatement Prepare(SQLiteConnection cnn, string strSql, SQLiteStatement previous, uint timeoutMS, ref string strRemain)
+    internal override SQLiteStatement Prepare(SQLiteConnection cnn, SQLiteCommand command, string strSql, SQLiteStatement previous, uint timeoutMS, ref string strRemain)
     {
       if (!String.IsNullOrEmpty(strSql)) strSql = strSql.Trim();
       if (!String.IsNullOrEmpty(strSql))
@@ -1475,26 +1571,28 @@ namespace System.Data.SQLite
         }
       }
 
-      SQLiteConnectionFlags flags =
-          (cnn != null) ? cnn.Flags : SQLiteConnectionFlags.Default;
+      SQLiteConnectionFlags flags = SQLiteConnection.GetFlags(cnn);
 
-      if (_forceLogPrepare ||
-          HelperMethods.LogPrepare(flags))
+      if (_forceLogPrepare || HelperMethods.LogPrepare(flags))
       {
-          if ((strSql == null) || (strSql.Length == 0) || (strSql.Trim().Length == 0))
-              SQLiteLog.LogMessage("Preparing {<nothing>}...");
-          else
-              SQLiteLog.LogMessage(HelperMethods.StringFormat(
-                  CultureInfo.CurrentCulture, "Preparing {{{0}}}...", strSql));
+          string logSql = strSql;
+
+          if ((logSql == null) || (logSql.Length == 0) || (logSql.Trim().Length == 0))
+              logSql = "<nothing>";
+
+          SQLiteLog.LogMessage(HelperMethods.StringFormat(
+              CultureInfo.CurrentCulture, "Preparing {{{0}}}...", logSql));
       }
 
       IntPtr stmt = IntPtr.Zero;
       IntPtr ptr = IntPtr.Zero;
       int len = 0;
       SQLiteErrorCode n = SQLiteErrorCode.Schema;
-      int retries = 0;
-      int maximumRetries = (cnn != null) ? cnn._prepareRetries : SQLiteConnection.DefaultPrepareRetries;
-      int maximumSleepTime = (cnn != null) ? cnn._defaultMaximumSleepTime : SQLiteConnection.DefaultConnectionMaximumSleepTime;
+      int schemaRetries = 0;
+      int lockRetries = 0;
+      int sleeps = 0;
+      int maximumRetries = SQLiteCommand.GetPrepareRetries(command);
+      int maximumSleepTime = SQLiteCommand.GetMaximumSleepTime(command);
       byte[] b = ToUTF8(strSql);
       string typedefs = null;
       SQLiteStatement cmd = null;
@@ -1508,7 +1606,7 @@ namespace System.Data.SQLite
       SQLiteStatementHandle statementHandle = null;
       try
       {
-        while ((n == SQLiteErrorCode.Schema || n == SQLiteErrorCode.Locked || n == SQLiteErrorCode.Busy) && retries < maximumRetries)
+        while (n == SQLiteErrorCode.Schema || n == SQLiteErrorCode.Locked || n == SQLiteErrorCode.Busy)
         {
           try
           {
@@ -1565,9 +1663,16 @@ namespace System.Data.SQLite
           }
 
           if (n == SQLiteErrorCode.Interrupt)
+          {
             break;
+          }
           else if (n == SQLiteErrorCode.Schema)
-            retries++;
+          {
+            schemaRetries++;
+
+            if ((maximumRetries >= 0) && (schemaRetries > maximumRetries))
+              throw new SQLiteException(n, GetLastError());
+          }
           else if (n == SQLiteErrorCode.Error)
           {
             if (String.Compare(GetLastError(), "near \"TYPES\": syntax error", StringComparison.OrdinalIgnoreCase) == 0)
@@ -1582,12 +1687,16 @@ namespace System.Data.SQLite
 
               while (cmd == null && strSql.Length > 0)
               {
-                cmd = Prepare(cnn, strSql, previous, timeoutMS, ref strRemain);
+                cmd = Prepare(cnn, command, strSql, previous, timeoutMS, ref strRemain);
                 strSql = strRemain;
               }
 
               if (cmd != null)
+              {
+                cmd._prepareSchemaRetries = schemaRetries;
+                cmd._prepareLockRetries = lockRetries;
                 cmd.SetTypes(typedefs);
+              }
 
               return cmd;
             }
@@ -1605,8 +1714,14 @@ namespace System.Data.SQLite
 
                 while (cmd == null && strSql.Length > 0)
                 {
-                  cmd = Prepare(cnn, strSql, previous, timeoutMS, ref strRemain);
+                  cmd = Prepare(cnn, command, strSql, previous, timeoutMS, ref strRemain);
                   strSql = strRemain;
+                }
+
+                if (cmd != null)
+                {
+                  cmd._prepareSchemaRetries = schemaRetries;
+                  cmd._prepareLockRetries = lockRetries;
                 }
 
                 return cmd;
@@ -1620,6 +1735,11 @@ namespace System.Data.SQLite
           }
           else if (n == SQLiteErrorCode.Locked || n == SQLiteErrorCode.Busy) // Locked -- delay a small amount before retrying
           {
+            lockRetries++;
+
+            if ((maximumRetries >= 0) && (lockRetries > maximumRetries))
+              throw new SQLiteException(n, GetLastError());
+
             // Keep trying
             if (rnd == null) // First time we've encountered the lock
               rnd = new Random();
@@ -1631,8 +1751,23 @@ namespace System.Data.SQLite
             }
             else
             {
+              int sleepMs = rnd.Next(1, maximumSleepTime);
+
+              if (_forceLogRetry || HelperMethods.LogRetry(flags))
+              {
+                  string logSql = strSql;
+
+                  if ((logSql == null) || (logSql.Length == 0) || (logSql.Trim().Length == 0))
+                      logSql = "<nothing>";
+
+                  SQLiteLog.LogMessage(HelperMethods.StringFormat(
+                      CultureInfo.CurrentCulture, "Will retry {0} prepare #{1} after {2}ms ({3}): {{{4}}}",
+                      n, lockRetries, sleepMs, sleeps, logSql));
+              }
+
               // Otherwise sleep for a random amount of time up to Xms
-              System.Threading.Thread.Sleep(rnd.Next(1, maximumSleepTime));
+              System.Threading.Thread.Sleep(sleepMs);
+              sleeps++;
             }
           }
         }
@@ -1655,6 +1790,12 @@ namespace System.Data.SQLite
         strRemain = UTF8ToString(ptr, len);
 
         if (statementHandle != null) cmd = new SQLiteStatement(this, flags, statementHandle, strSql.Substring(0, strSql.Length - strRemain.Length), previous);
+
+        if (cmd != null)
+        {
+          cmd._prepareSchemaRetries = schemaRetries;
+          cmd._prepareLockRetries = lockRetries;
+        }
 
         return cmd;
       }
@@ -3291,6 +3432,8 @@ namespace System.Data.SQLite
             case SQLiteConfigDbOpsEnum.SQLITE_DBCONFIG_ENABLE_VIEW: // int int*
             case SQLiteConfigDbOpsEnum.SQLITE_DBCONFIG_LEGACY_FILE_FORMAT: // int int*
             case SQLiteConfigDbOpsEnum.SQLITE_DBCONFIG_TRUSTED_SCHEMA: // int int*
+            case SQLiteConfigDbOpsEnum.SQLITE_DBCONFIG_STMT_SCANSTATUS: // int int*
+            case SQLiteConfigDbOpsEnum.SQLITE_DBCONFIG_REVERSE_SCANORDER: // int int*
                 {
                     if (!(value is bool))
                     {
@@ -3552,6 +3695,34 @@ namespace System.Data.SQLite
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
+    internal override SQLiteTransactionState GetTransactionState(
+        string schema
+        )
+    {
+        if (_sql == null)
+            return SQLiteTransactionState.SQLITE_TXN_UNKNOWN;
+
+        IntPtr pSchema = IntPtr.Zero;
+
+        try
+        {
+            if (schema != null)
+                pSchema = SQLiteString.Utf8IntPtrFromString(schema);
+
+            return UnsafeNativeMethods.sqlite3_txn_state(_sql, pSchema);
+        }
+        finally
+        {
+            if (pSchema != IntPtr.Zero)
+            {
+                SQLiteMemory.Free(pSchema);
+                pSchema = IntPtr.Zero;
+            }
+        }
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
     /// <summary>
     /// Appends an error message and an appropriate line-ending to a <see cref="StringBuilder" />
     /// instance.  This is useful because the .NET Compact Framework has a slightly different set
@@ -3583,6 +3754,67 @@ namespace System.Data.SQLite
 
     /// <summary>
     /// This method attempts to cause the SQLite native library to invalidate
+    /// its trace callback function pointers that refer to this instance.
+    /// This is necessary to prevent calls from native code into delegates
+    /// that may have been garbage collected.  Normally, these types of issues
+    /// can only arise for connections that are added to the pool; howver, it
+    /// is good practice to unconditionally invalidate function pointers that
+    /// may refer to objects being disposed.
+    /// </summary>
+    /// <param name="builder">
+    /// Appropriate error messages, if any, will be appended here.
+    /// </param>
+    /// <returns>
+    /// Non-zero if this method succeeds; otherwise, zero.
+    /// </returns>
+    private bool UnhookTraceCallback(
+        StringBuilder builder
+        )
+    {
+        try
+        {
+            //
+            // NOTE: When using version 3.14 (or later) of the SQLite core
+            //       library, use the newer sqlite3_trace_v2() API in order
+            //       to unhook the trace callback, just in case the older
+            //       API is not available (e.g. SQLITE_OMIT_DEPRECATED).
+            //
+            if (UnsafeNativeMethods.sqlite3_libversion_number() >= 3014000)
+                SetTraceCallback2(SQLiteTraceFlags.SQLITE_TRACE_NONE, null); /* throw */
+            else
+                SetTraceCallback(null); /* throw */
+
+            return true;
+        }
+#if !NET_COMPACT_20 && TRACE_CONNECTION
+        catch (Exception e)
+#else
+        catch (Exception)
+#endif
+        {
+#if !NET_COMPACT_20 && TRACE_CONNECTION
+            try
+            {
+                Trace.WriteLine(HelperMethods.StringFormat(
+                    CultureInfo.CurrentCulture,
+                    "Failed to unset trace callback: {0}",
+                    e)); /* throw */
+            }
+            catch
+            {
+                // do nothing.
+            }
+#endif
+
+            AppendError(builder, "failed to unset trace callback");
+            return false;
+        }
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    /// <summary>
+    /// This method attempts to cause the SQLite native library to invalidate
     /// its function pointers that refer to this instance.  This is necessary
     /// to prevent calls from native code into delegates that may have been
     /// garbage collected.  Normally, these types of issues can only arise for
@@ -3590,6 +3822,9 @@ namespace System.Data.SQLite
     /// unconditionally invalidate function pointers that may refer to objects
     /// being disposed.
     /// </summary>
+    /// <param name="includeTrace">
+    /// Non-zero to also invalidate trace callback function pointers.
+    /// </param>
     /// <param name="includeGlobal">
     /// Non-zero to also invalidate global function pointers (i.e. those that
     /// are not directly associated with this connection on the native side).
@@ -3602,6 +3837,7 @@ namespace System.Data.SQLite
     /// Non-zero if this method was successful; otherwise, zero.
     /// </returns>
     private bool UnhookNativeCallbacks(
+        bool includeTrace,
         bool includeGlobal,
         bool canThrow
         )
@@ -3615,6 +3851,16 @@ namespace System.Data.SQLite
         bool result = true;
         SQLiteErrorCode rc = SQLiteErrorCode.Ok;
         StringBuilder builder = new StringBuilder();
+
+        ///////////////////////////////////////////////////////////////////////////////////////////
+
+        #region Trace Callback (Per-Connection)
+        if (includeTrace && !UnhookTraceCallback(builder))
+        {
+            rc = SQLiteErrorCode.Error;
+            result = false;
+        }
+        #endregion
 
         ///////////////////////////////////////////////////////////////////////////////////////////
 
@@ -3644,49 +3890,6 @@ namespace System.Data.SQLite
 #endif
 
             AppendError(builder, "failed to unset rollback hook");
-            rc = SQLiteErrorCode.Error;
-
-            result = false;
-        }
-        #endregion
-
-        ///////////////////////////////////////////////////////////////////////////////////////////
-
-        #region Trace Callback (Per-Connection)
-        try
-        {
-            //
-            // NOTE: When using version 3.14 (or later) of the SQLite core
-            //       library, use the newer sqlite3_trace_v2() API in order
-            //       to unhook the trace callback, just in case the older
-            //       API is not available (e.g. SQLITE_OMIT_DEPRECATED).
-            //
-            if (UnsafeNativeMethods.sqlite3_libversion_number() >= 3014000)
-                SetTraceCallback2(SQLiteTraceFlags.SQLITE_TRACE_NONE, null); /* throw */
-            else
-                SetTraceCallback(null); /* throw */
-        }
-#if !NET_COMPACT_20 && TRACE_CONNECTION
-        catch (Exception e)
-#else
-        catch (Exception)
-#endif
-        {
-#if !NET_COMPACT_20 && TRACE_CONNECTION
-            try
-            {
-                Trace.WriteLine(HelperMethods.StringFormat(
-                    CultureInfo.CurrentCulture,
-                    "Failed to unset trace callback: {0}",
-                    e)); /* throw */
-            }
-            catch
-            {
-                // do nothing.
-            }
-#endif
-
-            AppendError(builder, "failed to unset trace callback");
             rc = SQLiteErrorCode.Error;
 
             result = false;
