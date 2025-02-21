@@ -224,18 +224,20 @@ runTest {test data-1.5 {GetSchema with ReservedWords} -setup {
 } -constraints {eagle command.object monoBug28 command.sql compile.DATA SQLite\
 System.Data.SQLite compileCSharp} -match regexp -result {^Ok\
 System#CodeDom#Compiler#CompilerResults#\d+ \{\} 0 System#Data#DataTable#\d+\
-\{ABORT ACTION ADD AFTER ALL ALTER ANALYZE AND AS ASC ATTACH AUTOINCREMENT\
-BEFORE BEGIN BETWEEN BY CASCADE CASE CAST CHECK COLLATE COLUMN COMMIT CONFLICT\
-CONSTRAINT CREATE CROSS CURRENT_DATE CURRENT_TIME CURRENT_TIMESTAMP DATABASE\
-DEFAULT DEFERRABLE DEFERRED DELETE DESC DETACH DISTINCT DO DROP EACH ELSE END\
-ESCAPE EXCEPT EXCLUSIVE EXISTS EXPLAIN FAIL FOR FOREIGN FROM FULL GLOB GROUP\
+\{ABORT ACTION ADD AFTER ALL ALTER ALWAYS ANALYZE AND AS ASC ATTACH\
+AUTOINCREMENT BEFORE BEGIN BETWEEN BY CASCADE CASE CAST CHECK COLLATE COLUMN\
+COMMIT CONFLICT CONSTRAINT CREATE CROSS CURRENT CURRENT_DATE CURRENT_TIME\
+CURRENT_TIMESTAMP DATABASE DEFAULT DEFERRABLE DEFERRED DELETE DESC DETACH\
+DISTINCT DO DROP EACH ELSE END ESCAPE EXCEPT EXCLUDE EXCLUSIVE EXISTS EXPLAIN\
+FAIL FILTER FIRST FOLLOWING FOR FOREIGN FROM FULL GENERATED GLOB GROUP GROUPS\
 HAVING IF IGNORE IMMEDIATE IN INDEX INDEXED INITIALLY INNER INSERT INSTEAD\
-INTERSECT INTO IS ISNULL JOIN KEY LEFT LIKE LIMIT MATCH NATURAL NO NOT NOTHING\
-NOTNULL NULL OF OFFSET ON OR ORDER OUTER PLAN PRAGMA PRIMARY QUERY RAISE\
-RECURSIVE REFERENCES REGEXP REINDEX RELEASE RENAME REPLACE RESTRICT RIGHT\
-ROLLBACK ROW SAVEPOINT SELECT SET TABLE TEMP TEMPORARY THEN TO TRANSACTION\
-TRIGGER UNION UNIQUE UPDATE USING VACUUM VALUES VIEW VIRTUAL WHEN WHERE WITH\
-WITHOUT\}$}}
+INTERSECT INTO IS ISNULL JOIN KEY LAST LEFT LIKE LIMIT MATCH MATERIALIZED\
+NATURAL NO NOT NOTHING NOTNULL NULL NULLS OF OFFSET ON OR ORDER OTHERS OUTER\
+OVER PARTITION PLAN PRAGMA PRECEDING PRIMARY QUERY RAISE RANGE RECURSIVE\
+REFERENCES REGEXP REINDEX RELEASE RENAME REPLACE RESTRICT RETURNING RIGHT\
+ROLLBACK ROW ROWS SAVEPOINT SELECT SET TABLE TEMP TEMPORARY THEN TIES TO\
+TRANSACTION TRIGGER UNBOUNDED UNION UNIQUE UPDATE USING VACUUM VALUES VIEW\
+VIRTUAL WHEN WHERE WINDOW WITH WITHOUT\}$}}
 
 ###############################################################################
 
@@ -1714,7 +1716,7 @@ runTest {test data-1.33 {SQLiteConnection.Open with SetDefaults=False} -setup {
   unset -nocomplain result db fileName
 } -constraints \
 {eagle monoBug28 command.sql compile.DATA SQLite System.Data.SQLite} -match \
-regexp -result [appendArgs ^ [getDbDefaultPageSize] " 1073741823 " \
+regexp -result [appendArgs ^ [getDbDefaultPageSize] " 4294967294 " \
 {(?:\{\}|0)} " 2 " [getDbDefaultCacheSize] " delete 0\$"]}
 
 ###############################################################################
@@ -1739,7 +1741,7 @@ runTest {test data-1.34 {SQLiteConnection.Open with SetDefaults=True} -setup {
   unset -nocomplain result db fileName
 } -constraints \
 {eagle monoBug28 command.sql compile.DATA SQLite System.Data.SQLite} -match \
-regexp -result [appendArgs ^ [getDbDefaultPageSize] " 1073741823 " \
+regexp -result [appendArgs ^ [getDbDefaultPageSize] " 4294967294 " \
 {(?:\{\}|1)} " 2 " [getDbDefaultCacheSize] " delete 0\$"]}
 
 ###############################################################################
@@ -1764,7 +1766,7 @@ runTest {test data-1.35 {SQLiteConnection.Open without SetDefaults} -setup {
   unset -nocomplain result db fileName
 } -constraints \
 {eagle monoBug28 command.sql compile.DATA SQLite System.Data.SQLite} -match \
-regexp -result [appendArgs ^ [getDbDefaultPageSize] " 1073741823 " \
+regexp -result [appendArgs ^ [getDbDefaultPageSize] " 4294967294 " \
 {(?:\{\}|0)} " 2 " [getDbDefaultCacheSize] " delete 0\$"]}
 
 ###############################################################################
@@ -4270,7 +4272,7 @@ runTest {test data-1.82 {IsReadOnly method} -setup {
 
   set result
 } -cleanup {
-  freeDbConnection
+  freeDbConnection connection true true
 
   unset -nocomplain connection
 
@@ -5059,6 +5061,8 @@ runTest {test data-1.95 {SetConfigurationOption method} -setup {
   lappend dbConfigs SQLITE_DBCONFIG_ENABLE_VIEW; # int int*
   lappend dbConfigs SQLITE_DBCONFIG_LEGACY_FILE_FORMAT; # int int*
   lappend dbConfigs SQLITE_DBCONFIG_TRUSTED_SCHEMA; # int int*
+  lappend dbConfigs SQLITE_DBCONFIG_STMT_SCANSTATUS; # int int*
+  lappend dbConfigs SQLITE_DBCONFIG_REVERSE_SCANORDER; # int int*
 
   set connection [getDbConnection]
 
@@ -5133,8 +5137,8 @@ runTest {test data-1.95 {SetConfigurationOption method} -setup {
   unset -nocomplain connection db fileName
 } -constraints {eagle monoBug28 command.sql compile.DATA SQLite\
 System.Data.SQLite} -match regexp -result {^\{\} \{\} \{\} \{\} \{\} \{\} \{\}\
-\{\} \{\} \{\} \{\} \{\} \{\} \{\} \{\} \{\} \{\} \{\} \{\} Ok 0 0 Ok \d+ \d+\
-True True$}}
+\{\} \{\} \{\} \{\} \{\} \{\} \{\} \{\} \{\} \{\} \{\} \{\} \{\} \{\} Ok 0 0 Ok\
+\d+ \d+ True True$}}
 
 ###############################################################################
 
@@ -5167,21 +5171,21 @@ runTest {test data-1.96 {connection pool interaction with read-only} -setup {
   sql execute $db "CREATE TABLE t1(x);"
   sql execute $db "INSERT INTO t1 (x) VALUES(1);"
 
-  cleanupDb $fileName db true false false
+  cleanupDb $fileName db true false false false false
   setupDb $fileName "" "" "" "" "Read Only=True;Pooling=True;" true false
 
   set code(1) [catch {
     sql execute $db "INSERT INTO t1 (x) VALUES(2);"
   } error(1)]
 
-  cleanupDb $fileName db true false false
+  cleanupDb $fileName db true false false false false
   setupDb $fileName "" "" "" "" "Read Only=True;Pooling=True;" true false
 
   set code(2) [catch {
     sql execute $db "INSERT INTO t1 (x) VALUES(3);"
   } error(2)]
 
-  cleanupDb $fileName db true false false
+  cleanupDb $fileName db true false false false false
   setupDb $fileName "" "" "" "" "" true false
 
   list [getPoolCounts] \
@@ -5925,6 +5929,392 @@ runTest {test data-1.111 {core-only math functions w/NoCoreFunctions} -setup {
   unset -nocomplain db fileName
 } -constraints {eagle monoBug28 command.sql compile.DATA SQLite\
 System.Data.SQLite sqlite3_c99_math} -result {0 0 0 0 0 0 0 0 0 1 0 0}}
+
+###############################################################################
+
+runTest {test data-1.112 {compress extension} -setup {
+  setupDb [set fileName data-1.112.db]
+} -body {
+  set connection [getDbConnection]
+  set result [list]
+
+  $connection EnableExtensions true
+
+  $connection LoadExtension \
+      [getCoreExtensionBinaryFileName null] sqlite3_compress_init
+
+  lappend result [sql execute -execute scalar $db "SELECT compress('1');"]
+
+  lappend result \
+      [sql execute -execute scalar $db "SELECT uncompress(compress('1'));"]
+
+  set result
+} -cleanup {
+  freeDbConnection
+
+  unset -nocomplain result connection
+
+  cleanupDb $fileName
+
+  unset -nocomplain db fileName
+} -constraints {eagle command.object monoBug28 command.sql compile.DATA SQLite\
+defineConstant.System.Data.SQLite.INTEROP_COMPRESS_EXTENSION\
+System.Data.SQLite SQLiteInterop} -result {{129 120 156 51 4 0 0 50 0 50} 49}}
+
+###############################################################################
+
+runTest {test data-1.113 {zipfile extension} -setup {
+  setupDb [set fileName data-1.113.db]
+} -body {
+  set connection [getDbConnection]
+  set result [list]
+
+  $connection EnableExtensions true
+
+  $connection LoadExtension \
+      [getCoreExtensionBinaryFileName null] sqlite3_zipfile_init
+
+  lappend result [sql execute -execute scalar $db \
+      "SELECT name FROM zipfile(?) WHERE name = 'htmlhelp.chm';" \
+      [list param1 String $htmlHelpDocsZipFile]]
+
+  set result
+} -cleanup {
+  freeDbConnection
+
+  unset -nocomplain result connection
+
+  cleanupDb $fileName
+
+  unset -nocomplain db fileName
+} -constraints {eagle command.object monoBug28 command.sql compile.DATA SQLite\
+defineConstant.System.Data.SQLite.INTEROP_ZIPFILE_EXTENSION\
+System.Data.SQLite SQLiteInterop} -result {htmlhelp.chm}}
+
+###############################################################################
+
+runTest {test data-1.114 {case-sensitive parameter names} -setup {
+  setupDb [set fileName data-1.114.db]
+
+  proc onChanged { sender e } {
+    if {[$e EventType] eq "NewCommand"} then {
+      $e Command.Parameters.NoCase false
+    }
+  }
+
+  set callback onChanged
+  object invoke System.Data.SQLite.SQLiteConnection add_Changed $callback
+} -body {
+  sql execute $db {
+    CREATE TABLE t101 (x);
+    INSERT INTO T101 (x) VALUES('Test');
+  }
+
+  list [catch {
+    sql execute -execute scalar $db \
+        "SELECT x FROM t101 WHERE x = :TEST;" [list test String test]
+  } result] [extractSystemDataSQLiteExceptionMessage $result]
+} -cleanup {
+  object invoke System.Data.SQLite.SQLiteConnection remove_Changed $callback
+  catch {object removecallback $callback}
+
+  cleanupDb $fileName
+
+  unset -nocomplain result callback
+  unset -nocomplain db fileName
+
+  rename onChanged ""
+} -constraints {eagle command.object monoBug28 command.sql compile.DATA SQLite\
+System.Data.SQLite} -result {1 {unknown error -- Insufficient parameters\
+supplied to the command}}}
+
+###############################################################################
+
+runTest {test data-1.115 {case-insensitive parameter names} -setup {
+  setupDb [set fileName data-1.115.db]
+
+  proc onChanged { sender e } {
+    if {[$e EventType] eq "NewCommand"} then {
+      $e Command.Parameters.NoCase true
+    }
+  }
+
+  set callback onChanged
+  object invoke System.Data.SQLite.SQLiteConnection add_Changed $callback
+} -body {
+  sql execute $db {
+    CREATE TABLE t101 (x);
+    INSERT INTO T101 (x) VALUES('Test');
+  }
+
+  set result [list]
+
+  lappend result [sql execute -execute scalar $db \
+      "SELECT x FROM t101 WHERE x = :TEST;" \
+      [list test String test]]
+
+  set result
+} -cleanup {
+  object invoke System.Data.SQLite.SQLiteConnection remove_Changed $callback
+  catch {object removecallback $callback}
+
+  cleanupDb $fileName
+
+  unset -nocomplain result callback
+  unset -nocomplain db fileName
+
+  rename onChanged ""
+} -constraints {eagle command.object monoBug28 command.sql compile.DATA SQLite\
+System.Data.SQLite} -result {{}}}
+
+###############################################################################
+
+#
+# NOTE: This test is disabled for .NET Core due to its lack of support for
+#       performance counters.
+#
+runTest {test data-1.116 {Serialize and Deserialize methods} -setup {
+  collectGarbage $test_channel
+
+  setupMemoryCounters counter
+  reportMemoryCounters $test_channel counter initial
+
+  set working(counter1Beg) [$counter(1) RawValue]
+  set working(counter2Beg) [$counter(2) RawValue]
+  set working(counter3Beg) [$counter(3) RawValue]
+
+  setupDb [set fileName(1) data-1.116.db]
+} -body {
+  set approximateDataSize 31522816; # 30MB + 64KB
+
+  sql execute $db {
+    CREATE TABLE t0(x);
+
+    CREATE TABLE t1(x);
+    INSERT INTO t1 (x) VALUES(RANDOMBLOB(1024));
+    INSERT INTO t1 (x) VALUES('test data-1.116');
+    INSERT INTO t1 (x) VALUES('');
+    INSERT INTO t1 (x) VALUES(NULL);
+    INSERT INTO t1 (x) VALUES(12345678);
+    INSERT INTO t1 (x) VALUES(1234.5678);
+
+    CREATE TABLE t2(x);
+    INSERT INTO t2 (x) VALUES(RANDOMBLOB(1));
+    INSERT INTO t2 (x) VALUES(RANDOMBLOB(256));
+
+    CREATE TABLE t3(x);
+    INSERT INTO t3 (x) VALUES(RANDOMBLOB(10485760));
+    INSERT INTO t3 (x) VALUES(RANDOMBLOB(10485760));
+    INSERT INTO t3 (x) VALUES(RANDOMBLOB(10485760));
+  }
+
+  set connection [getDbConnection]
+
+  $connection EnableExtensions true
+
+  $connection LoadExtension \
+      [getCoreExtensionBinaryFileName null] sqlite3_shathree_init
+
+  set hash(before,0) [sql execute -execute scalar $db {
+    SELECT hex(sha3_query('SELECT x FROM t0 ORDER BY rowId;'));
+  }]
+
+  set hash(before,1) [sql execute -execute scalar $db {
+    SELECT hex(sha3_query('SELECT x FROM t1 ORDER BY rowId;'));
+  }]
+
+  set hash(before,2) [sql execute -execute scalar $db {
+    SELECT hex(sha3_query('SELECT x FROM t2 ORDER BY rowId;'));
+  }]
+
+  set hash(before,3) [sql execute -execute scalar $db {
+    SELECT hex(sha3_query('SELECT x FROM t3 ORDER BY rowId;'));
+  }]
+
+  tputs $test_channel [appendArgs \
+      "---- before hash #0 is " $hash(before,0) \n]
+
+  tputs $test_channel [appendArgs \
+      "---- before hash #1 is " $hash(before,1) \n]
+
+  tputs $test_channel [appendArgs \
+      "---- before hash #2 is " $hash(before,2) \n]
+
+  tputs $test_channel [appendArgs \
+      "---- before hash #3 is " $hash(before,3) \n]
+
+  set data(db) [$connection -create -alias Serialize null]
+  set error null
+
+  set hash(before,data) [string toupper \
+      [object invoke Utility ToHexadecimalString \
+      [object invoke Utility HashBytes SHA512 $data(db) error]]]
+
+  tputs $test_channel [appendArgs \
+      "---- before data hash is " $hash(before,data) \n]
+
+  setupDb [set fileName(2) :memory:] \
+      "" "" "" "" "" false false false true memDb
+
+  set memConnection [getDbConnection memDb]
+
+  $memConnection EnableExtensions true
+
+  $memConnection LoadExtension \
+      [getCoreExtensionBinaryFileName null] sqlite3_shathree_init
+
+  $memConnection Deserialize null $data(db) true
+
+  set data(memDb) [$memConnection -create -alias Serialize null]
+  set error null
+
+  set hash(after,data) [string toupper \
+      [object invoke Utility ToHexadecimalString \
+      [object invoke Utility HashBytes SHA512 $data(memDb) error]]]
+
+  tputs $test_channel [appendArgs \
+      "---- after data hash is " $hash(after,data) \n]
+
+  set hash(after,0) [sql execute -execute scalar $memDb {
+    SELECT hex(sha3_query('SELECT x FROM t0 ORDER BY rowId;'));
+  }]
+
+  set hash(after,1) [sql execute -execute scalar $memDb {
+    SELECT hex(sha3_query('SELECT x FROM t1 ORDER BY rowId;'));
+  }]
+
+  set hash(after,2) [sql execute -execute scalar $memDb {
+    SELECT hex(sha3_query('SELECT x FROM t2 ORDER BY rowId;'));
+  }]
+
+  set hash(after,3) [sql execute -execute scalar $memDb {
+    SELECT hex(sha3_query('SELECT x FROM t3 ORDER BY rowId;'));
+  }]
+
+  tputs $test_channel [appendArgs \
+      "---- after hash #0 is " $hash(after,0) \n]
+
+  tputs $test_channel [appendArgs \
+      "---- after hash #1 is " $hash(after,1) \n]
+
+  tputs $test_channel [appendArgs \
+      "---- after hash #2 is " $hash(after,2) \n]
+
+  tputs $test_channel [appendArgs \
+      "---- after hash #3 is " $hash(after,3) \n]
+
+  list [expr {
+    $hash(before,0) eq $hash(after,0) ? True : \
+        [appendArgs $hash(before,0) " versus " $hash(after,0)]
+  }] [expr {
+    $hash(before,1) eq $hash(after,1) ? True : \
+        [appendArgs $hash(before,1) " versus " $hash(after,1)]
+  }] [expr {
+    $hash(before,2) eq $hash(after,2) ? True : \
+        [appendArgs $hash(before,2) " versus " $hash(after,2)]
+  }] [expr {
+    $hash(before,3) eq $hash(after,3) ? True : \
+        [appendArgs $hash(before,3) " versus " $hash(after,3)]
+  }] [expr {
+    $hash(before,data) eq $hash(after,data) ? True : \
+        [appendArgs $hash(before,data) " versus " $hash(after,data)]
+  }]
+} -cleanup {
+  freeDbConnection memConnection
+  freeDbConnection
+
+  unset -nocomplain connection memConnection
+
+  cleanupDb $fileName(2) memDb
+  cleanupDb $fileName(1)
+
+  unset -nocomplain data hash error
+  unset -nocomplain db memDb fileName
+
+  collectGarbage $test_channel
+  reportSQLiteResources $test_channel
+  reportMemoryCounters $test_channel counter final
+
+  set possibleLeaks 0
+
+  if {[catch {
+    object invoke -flags +NonPublic \
+        System.Data.SQLite.UnsafeNativeMethods sqlite3_memory_used
+  } memory] == 0} then {
+    if {$memory > 100} then {
+      tputs $test_channel [appendArgs \
+          "---- possible leak of " $memory " SQLite memory bytes\n"]
+
+      incr possibleLeaks $memory
+    }
+  } else {
+    tputs $test_channel [appendArgs \
+        "---- could not check SQLite memory bytes: " $memory \n]
+
+    incr possibleLeaks; # NOTE: Fail.
+  }
+
+  if {[haveSQLiteDefineConstant INTEROP_VIRTUAL_TABLE] && \
+      [haveSQLiteDefineConstant TRACK_MEMORY_BYTES]} then {
+    if {[catch {
+      object invoke -flags +NonPublic \
+          System.Data.SQLite.SQLiteMemory bytesAllocated
+    } memory] == 0} then {
+      if {$memory > 100} then {
+        tputs $test_channel [appendArgs \
+            "---- possible leak of " $memory " SQLiteMemory bytes\n"]
+
+        incr possibleLeaks $memory
+      }
+    } else {
+      tputs $test_channel [appendArgs \
+          "---- could not check SQLiteMemory bytes: " $memory \n]
+
+      incr possibleLeaks; # NOTE: Fail.
+    }
+  }
+
+  shutdownSQLite $test_channel
+
+  set working(counter1End) [$counter(1) RawValue]
+  set working(counter2End) [$counter(2) RawValue]
+  set working(counter3End) [$counter(3) RawValue]
+
+  set working(counter1Dif) [expr {
+    $working(counter1End) - $working(counter1Beg)
+  }]
+
+  set working(counter2Dif) [expr {
+    $working(counter2End) - $working(counter2Beg)
+  }]
+
+  set working(counter3Dif) [expr {
+    $working(counter3End) - $working(counter3Beg)
+  }]
+
+  if {$working(counter1Dif) >= $approximateDataSize} then {
+    incr possibleLeaks $working(counter1Dif)
+
+    tputs $test_channel [appendArgs \
+        "---- possible leak of " $working(counter1Dif) \
+        " \"Working Set\" bytes out of " $working(counter2Dif) \
+        " \"Working Set Peak\" bytes\n"]
+  }
+
+  unset -nocomplain working counter memory
+  unset -nocomplain approximateDataSize
+
+  if {$possibleLeaks > 0} then {
+    error [appendArgs \
+        "detected possible leaks of " $possibleLeaks " bytes" \
+        [unset -nocomplain possibleLeaks]]
+  } else {
+    unset -nocomplain possibleLeaks
+  }
+} -constraints [fixConstraints {eagle command.object !dotNetCore windows\
+monoBug28 command.sql compile.DATA SQLite\
+defineConstant.System.Data.SQLite.INTEROP_SHA3_EXTENSION System.Data.SQLite\
+SQLiteInterop}] -result {True True True True True}}
 
 ###############################################################################
 

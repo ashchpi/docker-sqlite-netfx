@@ -20,6 +20,12 @@ runSQLiteTestPrologue
 
 ###############################################################################
 
+#
+# HACK: Apparently, the .NET (Core?) runtime (sometimes) cannot manage to
+#       invoke some members via reflection; therefore, skip this test for
+#       that runtime.  Please see [getCreateCount] in "common.eagle" for
+#       further details.
+#
 runTest {test pool-1.1 {dispose connection with weak pool} -setup {
   object invoke -flags +NonPublic \
       System.Data.SQLite.SQLiteConnectionPool CreateAndInitialize \
@@ -144,11 +150,17 @@ runTest {test pool-1.1 {dispose connection with weak pool} -setup {
 
   unset -nocomplain results errors code sql dataSource id
   unset -nocomplain args time i m counts db fileName
-} -constraints {eagle monoBug28 command.sql compile.DATA SQLite\
-System.Data.SQLite compileCSharp} -result {5150 True}}
+} -constraints [fixConstraints {!dotNetCore eagle monoBug28 command.sql\
+compile.DATA SQLite System.Data.SQLite compileCSharp}] -result {5150 True}}
 
 ###############################################################################
 
+#
+# HACK: Apparently, the .NET (Core?) runtime (sometimes) cannot manage to
+#       invoke some members via reflection; therefore, skip this test for
+#       that runtime.  Please see [getCreateCount] in "common.eagle" for
+#       further details.
+#
 runTest {test pool-1.2 {dispose connection with strong pool} -setup {
   object invoke -flags +NonPublic \
       System.Data.SQLite.SQLiteConnectionPool CreateAndInitialize \
@@ -273,11 +285,17 @@ runTest {test pool-1.2 {dispose connection with strong pool} -setup {
 
   unset -nocomplain results errors code sql dataSource id
   unset -nocomplain args time i m counts db fileName
-} -constraints {eagle monoBug28 command.sql compile.DATA SQLite\
-System.Data.SQLite compileCSharp} -result {5150 True}}
+} -constraints [fixConstraints {!dotNetCore eagle monoBug28 command.sql\
+compile.DATA SQLite System.Data.SQLite compileCSharp}] -result {5150 True}}
 
 ###############################################################################
 
+#
+# HACK: Apparently, the .NET (Core?) runtime (sometimes) cannot manage to
+#       invoke some members via reflection; therefore, skip this test for
+#       that runtime.  Please see [getCreateCount] in "common.eagle" for
+#       further details.
+#
 runTest {test pool-1.3 {dispose connection with legacy pool} -setup {
   catch {
     object invoke -flags +NonPublic \
@@ -409,8 +427,159 @@ runTest {test pool-1.3 {dispose connection with legacy pool} -setup {
 
   unset -nocomplain results errors code sql dataSource id
   unset -nocomplain args time i m counts db fileName
-} -constraints {eagle monoBug28 command.sql compile.DATA SQLite\
-System.Data.SQLite compileCSharp} -result {5150 True}}
+} -constraints [fixConstraints {!dotNetCore eagle monoBug28 command.sql\
+compile.DATA SQLite System.Data.SQLite compileCSharp}] -result {5150 True}}
+
+###############################################################################
+
+runTest {test pool-1.4 {ConnectionPoolOnly flag with success} -setup {
+  object invoke -flags +NonPublic \
+      System.Data.SQLite.SQLiteConnectionPool CreateAndInitialize \
+      null true true
+
+  set fileName pool-1.4.db
+
+  setupDb $fileName "" "" "" "" "Pooling=True;" true false
+  cleanupDb $fileName db true false false false false
+} -body {
+  list [catch {
+    setupDb $fileName "" "" "" "" \
+        "Pooling=True;Flags=ConnectionPoolOnly;" true false
+  } result] [extractSystemDataSQLiteExceptionMessage $result] \
+      [cleanupDb $fileName] [file exists $fileName]
+} -cleanup {
+  catch {
+    object invoke -flags +NonPublic \
+        System.Data.SQLite.SQLiteConnectionPool ClearAllPools
+  }
+
+  catch {
+    object invoke -flags +NonPublic \
+        System.Data.SQLite.SQLiteConnectionPool TerminateAndReset \
+        null
+  }
+
+  cleanupDb $fileName
+
+  unset -nocomplain result db fileName
+} -constraints {eagle command.object monoBug28 command.sql compile.DATA SQLite\
+System.Data.SQLite} -match regexp -result \
+{^0 System#Data#SQLite#SQLiteConnection#\d+ 0 False$}}
+
+###############################################################################
+
+runTest {test pool-1.5 {ConnectionPoolOnly flag with failure} -setup {
+  object invoke -flags +NonPublic \
+      System.Data.SQLite.SQLiteConnectionPool CreateAndInitialize \
+      null true true
+
+  set fileName pool-1.5.db
+
+  setupDb $fileName "" "" "" "" "Pooling=True;" true false
+  cleanupDb $fileName db true false false false false
+
+  setupDb $fileName "" "" "" "" "Read Only=True;Pooling=True;" true false
+  cleanupDb $fileName db true false false false false
+} -body {
+  list [catch {
+    setupDb $fileName "" "" "" "" \
+        "Pooling=True;Flags=ConnectionPoolOnly;" true false
+  } result] [extractSystemDataSQLiteExceptionMessage $result] \
+      [cleanupDb $fileName] [file exists $fileName]
+} -cleanup {
+  catch {
+    object invoke -flags +NonPublic \
+        System.Data.SQLite.SQLiteConnectionPool ClearAllPools
+  }
+
+  catch {
+    object invoke -flags +NonPublic \
+        System.Data.SQLite.SQLiteConnectionPool TerminateAndReset \
+        null
+  }
+
+  cleanupDb $fileName
+
+  unset -nocomplain result db fileName
+} -constraints {eagle command.object monoBug28 command.sql compile.DATA SQLite\
+System.Data.SQLite} -result \
+{1 {unknown error -- no pooled connection available} 0 False}}
+
+###############################################################################
+
+runTest {test pool-2.1 {connection pool stress} -setup {
+  set fileName pool-2.1.db
+} -body {
+  set fileName [file join [getTemporaryDirectory] $fileName]
+
+  foreach usePooling [list True False] {
+    foreach useDataReader [list True False] {
+      object invoke -flags +NonPublic \
+          System.Data.SQLite.SQLiteConnectionPool ClearAllPools
+
+      object invoke -flags +NonPublic \
+          System.Data.SQLite.SQLiteConnectionPool TerminateAndReset \
+          null
+
+      for {set i 0} {$i < 100} {incr i} {
+        set extra [appendArgs Pooling= $usePooling \;]
+
+        if {$usePooling && $i > 0} then {
+          append extra Flags=ConnectionPoolOnly\;
+        }
+
+        setupDb $fileName "" "" "" "" $extra false false
+
+        sql execute $db {CREATE TABLE IF NOT EXISTS t1(x);}
+        set transaction [sql transaction begin $db]
+
+        for {set j 0} {$j < 10} {incr j} {
+          sql execute $db {
+            INSERT INTO t1(x) VALUES(RANDOMBLOB(1024));
+          }
+        }
+
+        sql transaction commit $transaction
+
+        if {$useDataReader} then {
+          set dataReader [sql execute -execute reader -format \
+              dataReader -alias $db {SELECT x FROM t1 ORDER BY x;}]
+
+          for {set k 0} {$k < $i % 10} {incr k} {
+            $dataReader Read
+          }
+
+          unset dataReader
+        } else {
+          sql execute -execute reader -format list $db \
+              {SELECT hex(x) FROM t1 ORDER BY x;}
+        }
+
+        cleanupDb $fileName db true false false false false
+      }
+    }
+  }
+
+  list success
+} -cleanup {
+  catch {
+    object invoke -flags +NonPublic \
+        System.Data.SQLite.SQLiteConnectionPool ClearAllPools
+  }
+
+  catch {
+    object invoke -flags +NonPublic \
+        System.Data.SQLite.SQLiteConnectionPool TerminateAndReset \
+        null
+  }
+
+  cleanupDb $fileName
+
+  unset -nocomplain i j k extra
+  unset -nocomplain usePooling useDataReader transaction dataReader
+  unset -nocomplain db fileName
+} -constraints {eagle command.object monoBug28 command.sql compile.DATA SQLite\
+System.Data.SQLite} -match regexp -result {success}}
 
 ###############################################################################
 

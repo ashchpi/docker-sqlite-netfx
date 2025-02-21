@@ -18,6 +18,8 @@ namespace System.Data.SQLite
   using System.Runtime.InteropServices;
   using System.Text;
   using System.Threading;
+  using DefinePair = System.Collections.Generic.KeyValuePair<string, int>;
+  using DefineDictionary = System.Collections.Generic.Dictionary<string, int>;
 
   /// <summary>
   /// This is the method signature for the SQLite core library logging callback
@@ -67,7 +69,7 @@ namespace System.Data.SQLite
         "d8215c18a4349a436dd499e3c385cc683015f886f6c10bd90115eb2bd61b67750839e3a19941dc9c";
 
 #if !PLATFORM_COMPACTFRAMEWORK
-    internal const string DesignerVersion = "1.0.118.0";
+    internal const string DesignerVersion = "1.0.119.0";
 #endif
 
     /// <summary>
@@ -188,11 +190,14 @@ namespace System.Data.SQLite
             _fileName = fileName;
             _returnToFileName = fileName;
 
-            SQLiteConnection.OnChanged(null, new ConnectionEventArgs(
-                SQLiteConnectionEventType.NewCriticalHandle, null,
-                null, null, null, _sql, fileName, new object[] {
-                typeof(SQLite3), fmt, kind, fmtString, db, fileName,
-                ownHandle }));
+            if (SQLiteConnection.CanOnChanged(null, false))
+            {
+                SQLiteConnection.OnChanged(null, new ConnectionEventArgs(
+                    SQLiteConnectionEventType.NewCriticalHandle, null,
+                    null, null, null, _sql, fileName, new object[] {
+                    typeof(SQLite3), fmt, kind, fmtString, db, fileName,
+                    ownHandle }));
+            }
         }
     }
 
@@ -368,6 +373,10 @@ namespace System.Data.SQLite
 
       retry:
 
+#if !NET_COMPACT_20 && TRACE_CONNECTION
+          string handle = HandleToString();
+#endif
+
           if (_returnToPool || _usePool)
           {
               if (SQLiteBase.ResetConnection(_sql, _sql, !disposing) &&
@@ -378,19 +387,19 @@ namespace System.Data.SQLite
                       if (SQLiteFunction.UnbindAllFunctions(this, _flags, false))
                       {
 #if !NET_COMPACT_20 && TRACE_CONNECTION
-                          Trace.WriteLine(HelperMethods.StringFormat(
+                          HelperMethods.Trace(HelperMethods.StringFormat(
                               CultureInfo.CurrentCulture,
                               "UnbindFunctions (Pool) Success: {0}",
-                              HandleToString()));
+                              handle), TraceCategory.Connection);
 #endif
                       }
                       else
                       {
 #if !NET_COMPACT_20 && TRACE_CONNECTION
-                          Trace.WriteLine(HelperMethods.StringFormat(
+                          HelperMethods.Trace(HelperMethods.StringFormat(
                               CultureInfo.CurrentCulture,
                               "UnbindFunctions (Pool) Failure: {0}",
-                              HandleToString()));
+                              handle), TraceCategory.Connection);
 #endif
                       }
                   }
@@ -401,25 +410,28 @@ namespace System.Data.SQLite
 
                   SQLiteConnectionPool.Add(_returnToFileName, _sql, _poolVersion);
 
-                  SQLiteConnection.OnChanged(null, new ConnectionEventArgs(
-                      SQLiteConnectionEventType.ClosedToPool, null, null,
-                      null, null, _sql, _returnToFileName, new object[] {
-                      typeof(SQLite3), !disposing, _returnToFileName, _poolVersion }));
+                  if (SQLiteConnection.CanOnChanged(null, false))
+                  {
+                      SQLiteConnection.OnChanged(null, new ConnectionEventArgs(
+                          SQLiteConnectionEventType.ClosedToPool, null, null,
+                          null, null, _sql, _returnToFileName, new object[] {
+                          typeof(SQLite3), !disposing, _returnToFileName, _poolVersion }));
+                  }
 
 #if !NET_COMPACT_20 && TRACE_CONNECTION
-                  Trace.WriteLine(HelperMethods.StringFormat(
+                  HelperMethods.Trace(HelperMethods.StringFormat(
                       CultureInfo.CurrentCulture,
                       "Close (Pool) Success: {0}",
-                      HandleToString()));
+                      handle), TraceCategory.Connection);
 #endif
               }
               else
               {
 #if !NET_COMPACT_20 && TRACE_CONNECTION
-                  Trace.WriteLine(HelperMethods.StringFormat(
+                  HelperMethods.Trace(HelperMethods.StringFormat(
                       CultureInfo.CurrentCulture,
                       "Close (Pool) Failure: {0}",
-                      HandleToString()));
+                      handle), TraceCategory.Connection);
 #endif
 
                   //
@@ -444,19 +456,19 @@ namespace System.Data.SQLite
                   if (SQLiteFunction.UnbindAllFunctions(this, _flags, false))
                   {
 #if !NET_COMPACT_20 && TRACE_CONNECTION
-                      Trace.WriteLine(HelperMethods.StringFormat(
+                      HelperMethods.Trace(HelperMethods.StringFormat(
                           CultureInfo.CurrentCulture,
                           "UnbindFunctions Success: {0}",
-                          HandleToString()));
+                          handle), TraceCategory.Connection);
 #endif
                   }
                   else
                   {
 #if !NET_COMPACT_20 && TRACE_CONNECTION
-                      Trace.WriteLine(HelperMethods.StringFormat(
+                      HelperMethods.Trace(HelperMethods.StringFormat(
                           CultureInfo.CurrentCulture,
                           "UnbindFunctions Failure: {0}",
-                          HandleToString()));
+                          handle), TraceCategory.Connection);
 #endif
                   }
               }
@@ -465,6 +477,13 @@ namespace System.Data.SQLite
               wasDisposed = true;
 
               FreeDbName(!disposing);
+
+#if !NET_COMPACT_20 && TRACE_CONNECTION
+              HelperMethods.Trace(HelperMethods.StringFormat(
+                  CultureInfo.CurrentCulture,
+                  "Close: {0}",
+                  handle), TraceCategory.Connection);
+#endif
           }
           _sql = null;
       }
@@ -473,6 +492,160 @@ namespace System.Data.SQLite
           GC.SuppressFinalize(this);
 
       return wasDisposed;
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    internal override byte[] Serialize(
+        string schema
+        )
+    {
+        bool mustFree = true;
+        IntPtr pSchema = IntPtr.Zero;
+        IntPtr pData = IntPtr.Zero;
+
+        try
+        {
+            if (_sql == null)
+                return null;
+
+            if (schema != null)
+                pSchema = SQLiteString.Utf8IntPtrFromString(schema);
+
+            SQLiteSerializeFlags flags =
+                SQLiteSerializeFlags.SQLITE_SERIALIZE_NOCOPY;
+
+            long dataSize = 0;
+
+            pData = UnsafeNativeMethods.sqlite3_serialize(
+                _sql, pSchema, ref dataSize, flags);
+
+            if (pData != IntPtr.Zero)
+            {
+                mustFree = false;
+            }
+            else
+            {
+                dataSize = 0;
+                flags &= ~SQLiteSerializeFlags.SQLITE_SERIALIZE_NOCOPY;
+
+                pData = UnsafeNativeMethods.sqlite3_serialize(
+                    _sql, pSchema, ref dataSize, flags);
+            }
+
+            if (pData == IntPtr.Zero)
+            {
+                throw new SQLiteException(
+                    SQLiteErrorCode.Error, "cannot serialize database");
+            }
+
+            if (dataSize < 0)
+                throw new ArgumentException("data size cannot be negative");
+
+            if (dataSize > int.MaxValue)
+            {
+                throw new ArgumentException(String.Format(
+                    "data size cannot exceed {0}", int.MaxValue));
+            }
+
+            return SQLiteBytes.FromIntPtr(pData, (int)dataSize);
+        }
+        finally
+        {
+            if (mustFree && (pData != IntPtr.Zero))
+            {
+                SQLiteMemory.Free(pData);
+                pData = IntPtr.Zero;
+            }
+
+            if (pSchema != IntPtr.Zero)
+            {
+                SQLiteMemory.Free(pSchema);
+                pSchema = IntPtr.Zero;
+            }
+        }
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    internal override void Deserialize(
+        string schema,
+        byte[] data,
+        bool readOnly
+        )
+    {
+        bool mustFree = true;
+        IntPtr pSchema = IntPtr.Zero;
+        IntPtr pData = IntPtr.Zero;
+
+        try
+        {
+            if (_sql == null)
+                throw new SQLiteException("no connection handle available");
+
+            if (data == null)
+                throw new ArgumentNullException("data");
+
+#if !PLATFORM_COMPACTFRAMEWORK
+            long dataSize = data.LongLength;
+#else
+            int dataSize = data.Length;
+#endif
+
+            if (dataSize < 0)
+                throw new ArgumentException("data size cannot be negative");
+
+#if !PLATFORM_COMPACTFRAMEWORK
+            if (dataSize > int.MaxValue)
+            {
+                throw new ArgumentException(String.Format(
+                    "data size cannot exceed {0}", int.MaxValue));
+            }
+#endif
+
+            pData = SQLiteMemory.Allocate64((ulong)dataSize);
+
+            if (pData == IntPtr.Zero)
+            {
+                throw new SQLiteException(
+                    SQLiteErrorCode.NoMem, "cannot deserialize database");
+            }
+
+            Marshal.Copy(data, 0, pData, (int)dataSize);
+
+            if (schema != null)
+                pSchema = SQLiteString.Utf8IntPtrFromString(schema);
+
+            SQLiteDeserializeFlags flags =
+                SQLiteDeserializeFlags.SQLITE_DESERIALIZE_FREEONCLOSE;
+
+            if (readOnly)
+                flags |= SQLiteDeserializeFlags.SQLITE_DESERIALIZE_READONLY;
+            else
+                flags |= SQLiteDeserializeFlags.SQLITE_DESERIALIZE_RESIZEABLE;
+
+            SQLiteErrorCode rc = UnsafeNativeMethods.sqlite3_deserialize(
+                _sql, pSchema, pData, dataSize, dataSize, flags);
+
+            if (rc == SQLiteErrorCode.Ok)
+                mustFree = false;
+            else
+                throw new SQLiteException(rc, GetLastError());
+        }
+        finally
+        {
+            if (mustFree && (pData != IntPtr.Zero))
+            {
+                SQLiteMemory.Free(pData);
+                pData = IntPtr.Zero;
+            }
+
+            if (pSchema != IntPtr.Zero)
+            {
+                SQLiteMemory.Free(pSchema);
+                pSchema = IntPtr.Zero;
+            }
+        }
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -643,28 +816,75 @@ namespace System.Data.SQLite
       }
     }
 
+    internal static string ProviderDefineConstants
+    {
+      get
+      {
+        return SQLiteConvert.ToString(SQLiteDefineConstants.OptionList, true);
+      }
+    }
+
     internal static string DefineConstants
     {
         get
         {
-            StringBuilder result = new StringBuilder();
-            IList<string> list = SQLiteDefineConstants.OptionList;
+            DefineDictionary dictionary = new DefineDictionary(
+                StringComparer.OrdinalIgnoreCase);
 
-            if (list != null)
+            foreach (IList<string> list in new IList<string>[] {
+                    SQLiteDefineConstants.OptionList,
+                    InteropCompileOptionList })
             {
-                foreach (string element in list)
+                if (list == null)
+                    continue;
+
+                foreach (string item in list)
                 {
-                    if (element == null)
+                    if (item == null)
                         continue;
 
-                    if (result.Length > 0)
-                        result.Append(' ');
+                    string interopItem = null;
+                    int count;
 
-                    result.Append(element);
+                    if (dictionary.TryGetValue(item, out count))
+                    {
+                        count++;
+                    }
+                    else if (!item.StartsWith("INTEROP_",
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        interopItem = String.Format(
+                            "INTEROP_{0}", item);
+
+                        if (dictionary.TryGetValue(
+                                interopItem, out count))
+                        {
+                            count++;
+                        }
+                        else
+                        {
+                            count = 1;
+                        }
+                    }
+                    else
+                    {
+                        count = 1;
+                    }
+
+                    dictionary[item] = count;
+
+                    if (interopItem != null)
+                        dictionary[interopItem] = count;
                 }
             }
 
-            return result.ToString();
+            IList<string> result = new List<string>();
+
+            foreach (DefinePair pair in dictionary)
+                if (pair.Value >= 2)
+                    result.Add(pair.Key);
+
+            return SQLiteConvert.ToString(result, true);
         }
     }
 
@@ -692,25 +912,30 @@ namespace System.Data.SQLite
       }
     }
 
-    internal static string SQLiteCompileOptions
+    internal static IList<string> SQLiteCompileOptionList
     {
         get
         {
-            StringBuilder result = new StringBuilder();
+            IList<string> result = new List<string>();
             int index = 0;
             IntPtr zValue = UnsafeNativeMethods.sqlite3_compileoption_get(index++);
 
             while (zValue != IntPtr.Zero)
             {
-                if (result.Length > 0)
-                    result.Append(' ');
-
-                result.Append(UTF8ToString(zValue, -1));
+                result.Add(UTF8ToString(zValue, -1));
                 zValue = UnsafeNativeMethods.sqlite3_compileoption_get(index++);
             }
 
-            return result.ToString();
+            return result;
         }
+    }
+
+    internal static string SQLiteCompileOptions
+    {
+      get
+      {
+        return SQLiteConvert.ToString(SQLiteCompileOptionList, true);
+      }
     }
 
     internal static string InteropVersion
@@ -737,29 +962,34 @@ namespace System.Data.SQLite
         }
     }
 
-    internal static string InteropCompileOptions
+    internal static IList<string> InteropCompileOptionList
     {
         get
         {
 #if !SQLITE_STANDARD
-            StringBuilder result = new StringBuilder();
+            IList<string> result = new List<string>();
             int index = 0;
             IntPtr zValue = UnsafeNativeMethods.interop_compileoption_get(index++);
 
             while (zValue != IntPtr.Zero)
             {
-                if (result.Length > 0)
-                    result.Append(' ');
-
-                result.Append(UTF8ToString(zValue, -1));
+                result.Add(UTF8ToString(zValue, -1));
                 zValue = UnsafeNativeMethods.interop_compileoption_get(index++);
             }
 
-            return result.ToString();
+            return result;
 #else
             return null;
 #endif
         }
+    }
+
+    internal static string InteropCompileOptions
+    {
+      get
+      {
+        return SQLiteConvert.ToString(InteropCompileOptionList, true);
+      }
     }
 
     internal override bool AutoCommit
@@ -1040,8 +1270,9 @@ namespace System.Data.SQLite
 #endif
             {
 #if !NET_COMPACT_20 && TRACE_CONNECTION
-                Trace.WriteLine(
-                    "Shutdown: Cannot reset directories on this platform.");
+                HelperMethods.Trace(
+                    "Shutdown: Cannot reset directories on this platform.",
+                    TraceCategory.Connection);
 #endif
             }
         }
@@ -1142,17 +1373,24 @@ namespace System.Data.SQLite
       {
         _sql = SQLiteConnectionPool.Remove(strFilename, maxPoolSize, out _poolVersion);
 
-        SQLiteConnection.OnChanged(null, new ConnectionEventArgs(
-            SQLiteConnectionEventType.OpenedFromPool, null, null,
-            null, null, _sql, strFilename, new object[] {
-            typeof(SQLite3), strFilename, vfsName, connectionFlags,
-            openFlags, maxPoolSize, usePool, _poolVersion }));
+        if (SQLiteConnection.CanOnChanged(null, false))
+        {
+            SQLiteConnection.OnChanged(null, new ConnectionEventArgs(
+                SQLiteConnectionEventType.OpenedFromPool, null, null,
+                null, null, _sql, strFilename, new object[] {
+                typeof(SQLite3), strFilename, vfsName, connectionFlags,
+                openFlags, maxPoolSize, usePool, _poolVersion }));
+        }
 
 #if !NET_COMPACT_20 && TRACE_CONNECTION
-        Trace.WriteLine(HelperMethods.StringFormat(
+        HelperMethods.Trace(HelperMethods.StringFormat(
             CultureInfo.CurrentCulture,
-            "Open (Pool): {0}", HandleToString()));
+            "Open (Pool): {0}", HandleToString()),
+            TraceCategory.Connection);
 #endif
+
+        if ((_sql == null) && HelperMethods.HasFlags(_flags, SQLiteConnectionFlags.ConnectionPoolOnly))
+            throw new SQLiteException("no pooled connection available");
       }
 
       if (_sql == null)
@@ -1181,9 +1419,9 @@ namespace System.Data.SQLite
 #endif
 
 #if !NET_COMPACT_20 && TRACE_CONNECTION
-          Trace.WriteLine(HelperMethods.StringFormat(
+          HelperMethods.Trace(HelperMethods.StringFormat(
               CultureInfo.CurrentCulture,
-              "Open: {0}", db));
+              "Open: {0}", db), TraceCategory.Connection);
 #endif
 
           if (n != SQLiteErrorCode.Ok) throw new SQLiteException(n, null);
@@ -1192,11 +1430,14 @@ namespace System.Data.SQLite
         }
         lock (_sql) { /* HACK: Force the SyncBlock to be "created" now. */ }
 
-        SQLiteConnection.OnChanged(null, new ConnectionEventArgs(
-            SQLiteConnectionEventType.NewCriticalHandle, null,
-            null, null, null, _sql, strFilename, new object[] {
-            typeof(SQLite3), strFilename, vfsName, connectionFlags,
-            openFlags, maxPoolSize, usePool }));
+        if (SQLiteConnection.CanOnChanged(null, false))
+        {
+            SQLiteConnection.OnChanged(null, new ConnectionEventArgs(
+                SQLiteConnectionEventType.NewCriticalHandle, null,
+                null, null, null, _sql, strFilename, new object[] {
+                typeof(SQLite3), strFilename, vfsName, connectionFlags,
+                openFlags, maxPoolSize, usePool }));
+        }
       }
 
       // Bind functions to this connection.  If any previous functions of the same name
@@ -1546,263 +1787,286 @@ namespace System.Data.SQLite
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    internal override SQLiteStatement Prepare(SQLiteConnection cnn, SQLiteCommand command, string strSql, SQLiteStatement previous, uint timeoutMS, ref string strRemain)
+    internal override SQLiteStatement Prepare(
+        SQLiteConnection cnn,
+        SQLiteCommand command,
+        string strSql,
+        SQLiteStatement previous,
+        uint timeoutMS,
+        ref string strRemain
+        )
     {
-      if (!String.IsNullOrEmpty(strSql)) strSql = strSql.Trim();
-      if (!String.IsNullOrEmpty(strSql))
-      {
-        //
-        // NOTE: SQLite does not support the concept of separate schemas
-        //       in one database; therefore, remove the base schema name
-        //       used to smooth integration with the base .NET Framework
-        //       data classes.
-        //
-        string baseSchemaName = (cnn != null) ? cnn._baseSchemaName : null;
-
-        if (!String.IsNullOrEmpty(baseSchemaName))
+        if (!String.IsNullOrEmpty(strSql)) strSql = strSql.Trim();
+        if (!String.IsNullOrEmpty(strSql))
         {
-          strSql = strSql.Replace(
-              HelperMethods.StringFormat(CultureInfo.InvariantCulture,
-              "[{0}].", baseSchemaName), String.Empty);
+            //
+            // NOTE: SQLite does not support the concept of separate schemas
+            //       in one database; therefore, remove the base schema name
+            //       used to smooth integration with the base .NET Framework
+            //       data classes.
+            //
+            string baseSchemaName = (cnn != null) ? cnn._baseSchemaName : null;
 
-          strSql = strSql.Replace(
-              HelperMethods.StringFormat(CultureInfo.InvariantCulture,
-              "{0}.", baseSchemaName), String.Empty);
+            if (!String.IsNullOrEmpty(baseSchemaName))
+            {
+                strSql = strSql.Replace(
+                    HelperMethods.StringFormat(CultureInfo.InvariantCulture,
+                    "[{0}].", baseSchemaName), String.Empty);
+
+                strSql = strSql.Replace(
+                    HelperMethods.StringFormat(CultureInfo.InvariantCulture,
+                    "{0}.", baseSchemaName), String.Empty);
+            }
         }
-      }
 
-      SQLiteConnectionFlags flags = SQLiteConnection.GetFlags(cnn);
+        SQLiteConnectionFlags flags = SQLiteConnection.GetFlags(cnn);
 
-      if (_forceLogPrepare || HelperMethods.LogPrepare(flags))
-      {
-          string logSql = strSql;
-
-          if ((logSql == null) || (logSql.Length == 0) || (logSql.Trim().Length == 0))
-              logSql = "<nothing>";
-
-          SQLiteLog.LogMessage(HelperMethods.StringFormat(
-              CultureInfo.CurrentCulture, "Preparing {{{0}}}...", logSql));
-      }
-
-      IntPtr stmt = IntPtr.Zero;
-      IntPtr ptr = IntPtr.Zero;
-      int len = 0;
-      SQLiteErrorCode n = SQLiteErrorCode.Schema;
-      int schemaRetries = 0;
-      int lockRetries = 0;
-      int sleeps = 0;
-      int maximumRetries = SQLiteCommand.GetPrepareRetries(command);
-      int maximumSleepTime = SQLiteCommand.GetMaximumSleepTime(command);
-      byte[] b = ToUTF8(strSql);
-      string typedefs = null;
-      SQLiteStatement cmd = null;
-      Random rnd = null;
-      uint starttick = (uint)Environment.TickCount;
-
-      ResetCancelCount();
-
-      GCHandle handle = GCHandle.Alloc(b, GCHandleType.Pinned);
-      IntPtr psql = handle.AddrOfPinnedObject();
-      SQLiteStatementHandle statementHandle = null;
-      try
-      {
-        while (n == SQLiteErrorCode.Schema || n == SQLiteErrorCode.Locked || n == SQLiteErrorCode.Busy)
+        if (_forceLogPrepare || HelperMethods.LogPrepare(flags))
         {
-          try
-          {
-            // do nothing.
-          }
-          finally /* NOTE: Thread.Abort() protection. */
-          {
-            stmt = IntPtr.Zero;
-            ptr = IntPtr.Zero;
+            string logSql = strSql;
+
+            if ((logSql == null) || (logSql.Length == 0) || (logSql.Trim().Length == 0))
+                logSql = "<nothing>";
+
+            SQLiteLog.LogMessage(HelperMethods.StringFormat(
+                CultureInfo.CurrentCulture, "Preparing {{{0}}}...", logSql));
+        }
+
+        SQLiteErrorCode n = SQLiteErrorCode.Schema;
+        int schemaRetries = 0;
+        int lockRetries = 0;
+        int sleeps = 0;
+        int maximumRetries = SQLiteCommand.GetPrepareRetries(command);
+        int maximumSleepTime = SQLiteCommand.GetMaximumSleepTime(command);
+        byte[] b = ToUTF8(strSql);
+        string typedefs = null;
+        SQLiteStatement cmd = null;
+        Random rnd = null;
+        uint starttick = (uint)Environment.TickCount;
+
+        ResetCancelCount();
+
+        bool success = false;
+        SQLiteStatementHandle statementHandle = null;
+
+        try
+        {
+            GCHandle handle = GCHandle.Alloc(b, GCHandleType.Pinned);
+
+            try
+            {
+                IntPtr ptr = IntPtr.Zero;
+                int len = 0;
+
+                while (n == SQLiteErrorCode.Schema || n == SQLiteErrorCode.Locked || n == SQLiteErrorCode.Busy)
+                {
+                    try
+                    {
+                        // do nothing.
+                    }
+                    finally /* NOTE: Thread.Abort() protection. */
+                    {
+                        IntPtr psql = handle.AddrOfPinnedObject();
+                        IntPtr stmt = IntPtr.Zero;
 
 #if !SQLITE_STANDARD
-            len = 0;
-            n = UnsafeNativeMethods.sqlite3_prepare_interop(_sql, psql, b.Length - 1, ref stmt, ref ptr, ref len);
+                        len = 0;
+                        n = UnsafeNativeMethods.sqlite3_prepare_interop(_sql, psql, b.Length - 1, ref stmt, ref ptr, ref len);
 #else
 #if USE_PREPARE_V2
-            n = UnsafeNativeMethods.sqlite3_prepare_v2(_sql, psql, b.Length - 1, ref stmt, ref ptr);
+                        n = UnsafeNativeMethods.sqlite3_prepare_v2(_sql, psql, b.Length - 1, ref stmt, ref ptr);
 #else
-            n = UnsafeNativeMethods.sqlite3_prepare(_sql, psql, b.Length - 1, ref stmt, ref ptr);
+                        n = UnsafeNativeMethods.sqlite3_prepare(_sql, psql, b.Length - 1, ref stmt, ref ptr);
 #endif
-            len = -1;
+                        len = -1;
 #endif
 
 #if !NET_COMPACT_20 && TRACE_STATEMENT
-            Trace.WriteLine(HelperMethods.StringFormat(
-                CultureInfo.CurrentCulture,
-                "Prepare ({0}): {1}", n, stmt));
+                        HelperMethods.Trace(HelperMethods.StringFormat(
+                            CultureInfo.CurrentCulture,
+                            "Prepare ({0}): {1}", n, stmt),
+                            TraceCategory.Statement);
 #endif
 
-            if ((n == SQLiteErrorCode.Ok) && (stmt != IntPtr.Zero))
-            {
-              if (statementHandle != null) statementHandle.Dispose();
-              statementHandle = new SQLiteStatementHandle(_sql, stmt);
-            }
-          }
+                        if ((n == SQLiteErrorCode.Ok) && (stmt != IntPtr.Zero))
+                        {
+                            if (statementHandle != null) statementHandle.Dispose();
+                            statementHandle = new SQLiteStatementHandle(_sql, stmt);
+                        }
+                    }
 
-          if (statementHandle != null)
-          {
-            SQLiteConnection.OnChanged(null, new ConnectionEventArgs(
-              SQLiteConnectionEventType.NewCriticalHandle, null, null,
-              null, null, statementHandle, strSql, new object[] {
-              typeof(SQLite3), cnn, strSql, previous, timeoutMS }));
-          }
+                    if (statementHandle != null)
+                    {
+                        if (SQLiteConnection.CanOnChanged(null, false))
+                        {
+                            SQLiteConnection.OnChanged(null, new ConnectionEventArgs(
+                                SQLiteConnectionEventType.NewCriticalHandle, null, null,
+                                null, null, statementHandle, strSql, new object[] {
+                                typeof(SQLite3), cnn, strSql, previous, timeoutMS }));
+                        }
+                    }
 
-          if (ShouldThrowForCancel())
-          {
-              if ((n == SQLiteErrorCode.Ok) ||
-                  (n == SQLiteErrorCode.Row) ||
-                  (n == SQLiteErrorCode.Done))
-              {
-                  n = SQLiteErrorCode.Interrupt;
-              }
+                    if (ShouldThrowForCancel())
+                    {
+                        if ((n == SQLiteErrorCode.Ok) ||
+                            (n == SQLiteErrorCode.Row) ||
+                            (n == SQLiteErrorCode.Done))
+                        {
+                            n = SQLiteErrorCode.Interrupt;
+                        }
 
-              throw new SQLiteException(n, null);
-          }
+                        throw new SQLiteException(n, null);
+                    }
 
-          if (n == SQLiteErrorCode.Interrupt)
-          {
-            break;
-          }
-          else if (n == SQLiteErrorCode.Schema)
-          {
-            schemaRetries++;
+                    if (n == SQLiteErrorCode.Interrupt)
+                    {
+                        break;
+                    }
+                    else if (n == SQLiteErrorCode.Schema)
+                    {
+                        schemaRetries++;
 
-            if ((maximumRetries >= 0) && (schemaRetries > maximumRetries))
-              throw new SQLiteException(n, GetLastError());
-          }
-          else if (n == SQLiteErrorCode.Error)
-          {
-            if (String.Compare(GetLastError(), "near \"TYPES\": syntax error", StringComparison.OrdinalIgnoreCase) == 0)
-            {
-              int pos = strSql.IndexOf(';');
-              if (pos == -1) pos = strSql.Length - 1;
+                        if ((maximumRetries >= 0) && (schemaRetries > maximumRetries))
+                            throw new SQLiteException(n, GetLastError());
+                    }
+                    else if (n == SQLiteErrorCode.Error)
+                    {
+                        if (String.Compare(GetLastError(), "near \"TYPES\": syntax error", StringComparison.OrdinalIgnoreCase) == 0)
+                        {
+                            int pos = strSql.IndexOf(';');
+                            if (pos == -1) pos = strSql.Length - 1;
 
-              typedefs = strSql.Substring(0, pos + 1);
-              strSql = strSql.Substring(pos + 1);
+                            typedefs = strSql.Substring(0, pos + 1);
+                            strSql = strSql.Substring(pos + 1);
 
-              strRemain = String.Empty;
+                            strRemain = String.Empty;
 
-              while (cmd == null && strSql.Length > 0)
-              {
-                cmd = Prepare(cnn, command, strSql, previous, timeoutMS, ref strRemain);
-                strSql = strRemain;
-              }
+                            while (cmd == null && strSql.Length > 0)
+                            {
+                                cmd = Prepare(cnn, command, strSql, previous, timeoutMS, ref strRemain);
+                                strSql = strRemain;
+                            }
 
-              if (cmd != null)
-              {
-                cmd._prepareSchemaRetries = schemaRetries;
-                cmd._prepareLockRetries = lockRetries;
-                cmd.SetTypes(typedefs);
-              }
+                            if (cmd != null)
+                            {
+                                cmd._prepareSchemaRetries = schemaRetries;
+                                cmd._prepareLockRetries = lockRetries;
+                                cmd.SetTypes(typedefs);
+                            }
 
-              return cmd;
-            }
+                            return cmd;
+                        }
 #if (NET_35 || NET_40 || NET_45 || NET_451 || NET_452 || NET_46 || NET_461 || NET_462 || NET_47 || NET_471 || NET_472 || NET_48) && !PLATFORM_COMPACTFRAMEWORK
-            else if (_buildingSchema == false && String.Compare(GetLastError(), 0, "no such table: TEMP.SCHEMA", 0, 26, StringComparison.OrdinalIgnoreCase) == 0)
-            {
-              strRemain = String.Empty;
-              _buildingSchema = true;
-              try
-              {
-                ISQLiteSchemaExtensions ext = ((IServiceProvider)SQLiteFactory.Instance).GetService(typeof(ISQLiteSchemaExtensions)) as ISQLiteSchemaExtensions;
+                        else if (_buildingSchema == false && String.Compare(GetLastError(), 0, "no such table: TEMP.SCHEMA", 0, 26, StringComparison.OrdinalIgnoreCase) == 0)
+                        {
+                            strRemain = String.Empty;
+                            _buildingSchema = true;
 
-                if (ext != null)
-                  ext.BuildTempSchema(cnn);
+                            try
+                            {
+                                ISQLiteSchemaExtensions ext = ((IServiceProvider)SQLiteFactory.Instance).GetService(typeof(ISQLiteSchemaExtensions)) as ISQLiteSchemaExtensions;
 
-                while (cmd == null && strSql.Length > 0)
-                {
-                  cmd = Prepare(cnn, command, strSql, previous, timeoutMS, ref strRemain);
-                  strSql = strRemain;
+                                if (ext != null)
+                                    ext.BuildTempSchema(cnn);
+
+                                while (cmd == null && strSql.Length > 0)
+                                {
+                                    cmd = Prepare(cnn, command, strSql, previous, timeoutMS, ref strRemain);
+                                    strSql = strRemain;
+                                }
+
+                                if (cmd != null)
+                                {
+                                    cmd._prepareSchemaRetries = schemaRetries;
+                                    cmd._prepareLockRetries = lockRetries;
+                                }
+
+                                return cmd;
+                            }
+                            finally
+                            {
+                                _buildingSchema = false;
+                            }
+                        }
+#endif
+                    }
+                    else if (n == SQLiteErrorCode.Locked || n == SQLiteErrorCode.Busy) // Locked -- delay a small amount before retrying
+                    {
+                        lockRetries++;
+
+                        if ((maximumRetries >= 0) && (lockRetries > maximumRetries))
+                            throw new SQLiteException(n, GetLastError());
+
+                        // Keep trying
+                        if (rnd == null) // First time we've encountered the lock
+                            rnd = new Random();
+
+                        // If we've exceeded the command's timeout, give up and throw an error
+                        if ((uint)Environment.TickCount - starttick > timeoutMS)
+                        {
+                            throw new SQLiteException(n, GetLastError());
+                        }
+                        else
+                        {
+                            int sleepMs = rnd.Next(1, maximumSleepTime);
+
+                            if (_forceLogRetry || HelperMethods.LogRetry(flags))
+                            {
+                                string logSql = strSql;
+
+                                if ((logSql == null) || (logSql.Length == 0) || (logSql.Trim().Length == 0))
+                                    logSql = "<nothing>";
+
+                                SQLiteLog.LogMessage(HelperMethods.StringFormat(
+                                    CultureInfo.CurrentCulture, "Will retry {0} prepare #{1} after {2}ms ({3}): {{{4}}}",
+                                    n, lockRetries, sleepMs, sleeps, logSql));
+                            }
+
+                            // Otherwise sleep for a random amount of time up to Xms
+                            System.Threading.Thread.Sleep(sleepMs);
+                            sleeps++;
+                        }
+                    }
                 }
+
+                if (ShouldThrowForCancel())
+                {
+                    if ((n == SQLiteErrorCode.Ok) ||
+                        (n == SQLiteErrorCode.Row) ||
+                        (n == SQLiteErrorCode.Done))
+                    {
+                        n = SQLiteErrorCode.Interrupt;
+                    }
+
+                    throw new SQLiteException(n, null);
+                }
+
+                if (n == SQLiteErrorCode.Interrupt) return null;
+                if (n != SQLiteErrorCode.Ok) throw new SQLiteException(n, GetLastError());
+
+                strRemain = UTF8ToString(ptr, len);
+
+                if (statementHandle != null) cmd = new SQLiteStatement(this, flags, statementHandle, strSql.Substring(0, strSql.Length - strRemain.Length), previous);
 
                 if (cmd != null)
                 {
-                  cmd._prepareSchemaRetries = schemaRetries;
-                  cmd._prepareLockRetries = lockRetries;
+                    cmd._prepareSchemaRetries = schemaRetries;
+                    cmd._prepareLockRetries = lockRetries;
                 }
 
+                success = true;
                 return cmd;
-              }
-              finally
-              {
-                _buildingSchema = false;
-              }
             }
-#endif
-          }
-          else if (n == SQLiteErrorCode.Locked || n == SQLiteErrorCode.Busy) // Locked -- delay a small amount before retrying
-          {
-            lockRetries++;
-
-            if ((maximumRetries >= 0) && (lockRetries > maximumRetries))
-              throw new SQLiteException(n, GetLastError());
-
-            // Keep trying
-            if (rnd == null) // First time we've encountered the lock
-              rnd = new Random();
-
-            // If we've exceeded the command's timeout, give up and throw an error
-            if ((uint)Environment.TickCount - starttick > timeoutMS)
+            finally
             {
-              throw new SQLiteException(n, GetLastError());
+                handle.Free();
             }
-            else
-            {
-              int sleepMs = rnd.Next(1, maximumSleepTime);
-
-              if (_forceLogRetry || HelperMethods.LogRetry(flags))
-              {
-                  string logSql = strSql;
-
-                  if ((logSql == null) || (logSql.Length == 0) || (logSql.Trim().Length == 0))
-                      logSql = "<nothing>";
-
-                  SQLiteLog.LogMessage(HelperMethods.StringFormat(
-                      CultureInfo.CurrentCulture, "Will retry {0} prepare #{1} after {2}ms ({3}): {{{4}}}",
-                      n, lockRetries, sleepMs, sleeps, logSql));
-              }
-
-              // Otherwise sleep for a random amount of time up to Xms
-              System.Threading.Thread.Sleep(sleepMs);
-              sleeps++;
-            }
-          }
         }
-
-        if (ShouldThrowForCancel())
+        finally
         {
-            if ((n == SQLiteErrorCode.Ok) ||
-                (n == SQLiteErrorCode.Row) ||
-                (n == SQLiteErrorCode.Done))
-            {
-                n = SQLiteErrorCode.Interrupt;
-            }
-
-            throw new SQLiteException(n, null);
+            if (!success && (statementHandle != null))
+                statementHandle.Dispose();
         }
-
-        if (n == SQLiteErrorCode.Interrupt) return null;
-        if (n != SQLiteErrorCode.Ok) throw new SQLiteException(n, GetLastError());
-
-        strRemain = UTF8ToString(ptr, len);
-
-        if (statementHandle != null) cmd = new SQLiteStatement(this, flags, statementHandle, strSql.Substring(0, strSql.Length - strRemain.Length), previous);
-
-        if (cmd != null)
-        {
-          cmd._prepareSchemaRetries = schemaRetries;
-          cmd._prepareLockRetries = lockRetries;
-        }
-
-        return cmd;
-      }
-      finally
-      {
-        handle.Free();
-      }
     }
 
     protected static void LogBind(SQLiteStatementHandle handle, int index)
@@ -2091,7 +2355,7 @@ namespace System.Data.SQLite
                 }
             case SQLiteDateFormats.UnixEpoch:
                 {
-                    long value = Convert.ToInt64(dt.Subtract(UnixEpoch).TotalSeconds);
+                    long value = dt.Subtract(UnixEpoch).Ticks / TimeSpan.TicksPerSecond;
 
                     if (_forceLogPrepare || HelperMethods.LogBind(flags))
                     {
@@ -2915,10 +3179,10 @@ namespace System.Data.SQLite
                 _usePool = false;
 
 #if !NET_COMPACT_20 && TRACE_CONNECTION
-                Trace.WriteLine(HelperMethods.StringFormat(
+                HelperMethods.Trace(HelperMethods.StringFormat(
                     CultureInfo.CurrentCulture,
                     "CreateModule (Pool) Disabled: {0}",
-                    HandleToString()));
+                    HandleToString()), TraceCategory.Connection);
 #endif
             }
         }
@@ -3583,10 +3847,10 @@ namespace System.Data.SQLite
         _usePool = false;
 
 #if !NET_COMPACT_20 && TRACE_CONNECTION
-        Trace.WriteLine(HelperMethods.StringFormat(
+        HelperMethods.Trace(HelperMethods.StringFormat(
           CultureInfo.CurrentCulture,
           "SetPassword (Pool) Disabled: {0}",
-          HandleToString()));
+          HandleToString()), TraceCategory.Connection);
 #endif
       }
     }
@@ -3608,10 +3872,10 @@ namespace System.Data.SQLite
         _returnToPool = false;
 
 #if !NET_COMPACT_20 && TRACE_CONNECTION
-        Trace.WriteLine(HelperMethods.StringFormat(
+        HelperMethods.Trace(HelperMethods.StringFormat(
           CultureInfo.CurrentCulture,
           "ChangePassword (Pool) Disabled: {0}",
-          HandleToString()));
+          HandleToString()), TraceCategory.Connection);
 #endif
       }
     }
@@ -3674,19 +3938,20 @@ namespace System.Data.SQLite
             _setLogCallback = (func != null);
 
 #if !NET_COMPACT_20 && TRACE_CONNECTION
-            Trace.WriteLine(HelperMethods.StringFormat(
+            HelperMethods.Trace(HelperMethods.StringFormat(
                 CultureInfo.CurrentCulture,
                 "SetLogCallback: SUCCESS ==> {0}",
-                _setLogCallback ? "SET" : "UNSET"));
+                _setLogCallback ? "SET" : "UNSET"),
+                TraceCategory.Connection);
 #endif
         }
 #if !NET_COMPACT_20 && TRACE_CONNECTION
         else
         {
-            Trace.WriteLine(HelperMethods.StringFormat(
+            HelperMethods.Trace(HelperMethods.StringFormat(
                 CultureInfo.CurrentCulture,
                 "SetLogCallback: FAILURE ==> {0}",
-                rc));
+                rc), TraceCategory.Connection);
         }
 #endif
 
@@ -3795,10 +4060,10 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_CONNECTION
             try
             {
-                Trace.WriteLine(HelperMethods.StringFormat(
+                HelperMethods.Trace(HelperMethods.StringFormat(
                     CultureInfo.CurrentCulture,
                     "Failed to unset trace callback: {0}",
-                    e)); /* throw */
+                    e), TraceCategory.Connection); /* throw */
             }
             catch
             {
@@ -3878,10 +4143,10 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_CONNECTION
             try
             {
-                Trace.WriteLine(HelperMethods.StringFormat(
+                HelperMethods.Trace(HelperMethods.StringFormat(
                     CultureInfo.CurrentCulture,
                     "Failed to unset rollback hook: {0}",
-                    e)); /* throw */
+                    e), TraceCategory.Connection); /* throw */
             }
             catch
             {
@@ -3912,10 +4177,10 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_CONNECTION
             try
             {
-                Trace.WriteLine(HelperMethods.StringFormat(
+                HelperMethods.Trace(HelperMethods.StringFormat(
                     CultureInfo.CurrentCulture,
                     "Failed to unset commit hook: {0}",
-                    e)); /* throw */
+                    e), TraceCategory.Connection); /* throw */
             }
             catch
             {
@@ -3946,10 +4211,10 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_CONNECTION
             try
             {
-                Trace.WriteLine(HelperMethods.StringFormat(
+                HelperMethods.Trace(HelperMethods.StringFormat(
                     CultureInfo.CurrentCulture,
                     "Failed to unset update hook: {0}",
-                    e)); /* throw */
+                    e), TraceCategory.Connection); /* throw */
             }
             catch
             {
@@ -3980,10 +4245,10 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_CONNECTION
             try
             {
-                Trace.WriteLine(HelperMethods.StringFormat(
+                HelperMethods.Trace(HelperMethods.StringFormat(
                     CultureInfo.CurrentCulture,
                     "Failed to unset authorizer hook: {0}",
-                    e)); /* throw */
+                    e), TraceCategory.Connection); /* throw */
             }
             catch
             {
@@ -4014,10 +4279,10 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_CONNECTION
             try
             {
-                Trace.WriteLine(HelperMethods.StringFormat(
+                HelperMethods.Trace(HelperMethods.StringFormat(
                     CultureInfo.CurrentCulture,
                     "Failed to unset busy hook: {0}",
-                    e)); /* throw */
+                    e), TraceCategory.Connection); /* throw */
             }
             catch
             {
@@ -4048,10 +4313,10 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_CONNECTION
             try
             {
-                Trace.WriteLine(HelperMethods.StringFormat(
+                HelperMethods.Trace(HelperMethods.StringFormat(
                     CultureInfo.CurrentCulture,
                     "Failed to unset progress hook: {0}",
-                    e)); /* throw */
+                    e), TraceCategory.Connection); /* throw */
             }
             catch
             {
@@ -4098,10 +4363,10 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_CONNECTION
                 try
                 {
-                    Trace.WriteLine(HelperMethods.StringFormat(
+                    HelperMethods.Trace(HelperMethods.StringFormat(
                         CultureInfo.CurrentCulture,
                         "Failed to unset log callback: {0}",
-                        e)); /* throw */
+                        e), TraceCategory.Connection); /* throw */
                 }
                 catch
                 {
@@ -4161,10 +4426,10 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_CONNECTION
             try
             {
-                Trace.WriteLine(HelperMethods.StringFormat(
+                HelperMethods.Trace(HelperMethods.StringFormat(
                     CultureInfo.CurrentCulture,
                     "Failed to free database name: {0}",
-                    e)); /* throw */
+                    e), TraceCategory.Connection); /* throw */
             }
             catch
             {
@@ -4253,10 +4518,13 @@ namespace System.Data.SQLite
             backupHandle = new SQLiteBackupHandle(destHandle, backup);
         }
 
-        SQLiteConnection.OnChanged(null, new ConnectionEventArgs(
-            SQLiteConnectionEventType.NewCriticalHandle, null,
-            null, null, null, backupHandle, null, new object[] {
-            typeof(SQLite3), destCnn, destName, sourceName }));
+        if (SQLiteConnection.CanOnChanged(null, false))
+        {
+            SQLiteConnection.OnChanged(null, new ConnectionEventArgs(
+                SQLiteConnectionEventType.NewCriticalHandle, null,
+                null, null, null, backupHandle, null, new object[] {
+                typeof(SQLite3), destCnn, destName, sourceName }));
+        }
 
         return new SQLiteBackup(
             this, backupHandle, destHandle, zDestName, sourceHandle,

@@ -34,7 +34,7 @@
 			OutputDirectory="$(ProjectDir)..\bin\$(ConfigurationYear)\$(PlatformName)\$(ConfigurationName)"
 			IntermediateDirectory="..\obj\$(ConfigurationYear)\$(PlatformName)\$(ConfigurationName)"
 			ConfigurationType="2"
-			InheritedPropertySheets=".\props\sqlite3.vsprops;.\props\SQLite.Interop.2008.vsprops;.\props\include.vsprops"
+			InheritedPropertySheets=".\props\$(ConfigurationName).vsprops;.\props\sqlite3.vsprops;.\props\SQLite.Interop.2008.vsprops;.\props\include.vsprops"
 			CharacterSet="1"
 			>
 			<Tool
@@ -83,8 +83,8 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions=" /subsystem:windowsce,4.20 /machine:ARM /ARMPADCODE"
-				AdditionalLibraryDirectories="$(INTEROP_LIBRARY_DIRECTORIES)"
-				AdditionalDependencies="secchk.lib $(INTEROP_LIBRARY_DEPENDENCIES)"
+				AdditionalLibraryDirectories="$(INTEROP_CE200X_LIBRARY_DIRECTORIES)"
+				AdditionalDependencies="secchk.lib $(INTEROP_CE200X_LIBRARY_DEPENDENCIES)"
 				OutputFile="$(OutDir)\SQLite.Interop.$(INTEROP_BUILD_NUMBER).dll"
 				Version="$(INTEROP_LINKER_VERSION)"
 				LinkIncremental="2"
@@ -133,7 +133,7 @@
 			OutputDirectory="$(ProjectDir)..\bin\$(ConfigurationYear)\$(PlatformName)\$(ConfigurationName)"
 			IntermediateDirectory="..\obj\$(ConfigurationYear)\$(PlatformName)\$(ConfigurationName)"
 			ConfigurationType="2"
-			InheritedPropertySheets=".\props\sqlite3.vsprops;.\props\SQLite.Interop.2008.vsprops;.\props\include.vsprops"
+			InheritedPropertySheets=".\props\$(ConfigurationName).vsprops;.\props\sqlite3.vsprops;.\props\SQLite.Interop.2008.vsprops;.\props\include.vsprops"
 			CharacterSet="1"
 			>
 			<Tool
@@ -182,8 +182,8 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions=" /subsystem:windowsce,4.20 /machine:ARM /ARMPADCODE"
-				AdditionalLibraryDirectories="$(INTEROP_LIBRARY_DIRECTORIES)"
-				AdditionalDependencies="secchk.lib $(INTEROP_LIBRARY_DEPENDENCIES)"
+				AdditionalLibraryDirectories="$(INTEROP_CE200X_LIBRARY_DIRECTORIES)"
+				AdditionalDependencies="secchk.lib $(INTEROP_CE200X_LIBRARY_DEPENDENCIES)"
 				OutputFile="$(OutDir)\SQLite.Interop.$(INTEROP_BUILD_NUMBER).dll"
 				Version="$(INTEROP_LINKER_VERSION)"
 				LinkIncremental="1"
@@ -234,7 +234,7 @@
 			OutputDirectory="$(ProjectDir)..\bin\$(ConfigurationYear)\$(PlatformName)\$(ConfigurationName)"
 			IntermediateDirectory="..\obj\$(ConfigurationYear)\$(PlatformName)\$(ConfigurationName)"
 			ConfigurationType="2"
-			InheritedPropertySheets=".\props\sqlite3.vsprops;.\props\SQLite.Interop.2008.vsprops;.\props\include.vsprops"
+			InheritedPropertySheets=".\props\$(ConfigurationName).vsprops;.\props\sqlite3.vsprops;.\props\SQLite.Interop.2008.vsprops;.\props\include.vsprops"
 			CharacterSet="1"
 			>
 			<Tool
@@ -282,8 +282,8 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions=" /subsystem:windowsce,5.01"
-				AdditionalLibraryDirectories="$(INTEROP_LIBRARY_DIRECTORIES)"
-				AdditionalDependencies="$(INTEROP_LIBRARY_DEPENDENCIES)"
+				AdditionalLibraryDirectories="$(INTEROP_CE200X_LIBRARY_DIRECTORIES)"
+				AdditionalDependencies="$(INTEROP_CE200X_LIBRARY_DEPENDENCIES)"
 				OutputFile="$(OutDir)\SQLite.Interop.$(INTEROP_BUILD_NUMBER).dll"
 				Version="$(INTEROP_LINKER_VERSION)"
 				LinkIncremental="2"
@@ -331,7 +331,7 @@
 			OutputDirectory="$(ProjectDir)..\bin\$(ConfigurationYear)\$(PlatformName)\$(ConfigurationName)"
 			IntermediateDirectory="..\obj\$(ConfigurationYear)\$(PlatformName)\$(ConfigurationName)"
 			ConfigurationType="2"
-			InheritedPropertySheets=".\props\sqlite3.vsprops;.\props\SQLite.Interop.2008.vsprops;.\props\include.vsprops"
+			InheritedPropertySheets=".\props\$(ConfigurationName).vsprops;.\props\sqlite3.vsprops;.\props\SQLite.Interop.2008.vsprops;.\props\include.vsprops"
 			CharacterSet="1"
 			>
 			<Tool
@@ -379,8 +379,8 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions=" /subsystem:windowsce,5.01"
-				AdditionalLibraryDirectories="$(INTEROP_LIBRARY_DIRECTORIES)"
-				AdditionalDependencies="$(INTEROP_LIBRARY_DEPENDENCIES)"
+				AdditionalLibraryDirectories="$(INTEROP_CE200X_LIBRARY_DIRECTORIES)"
+				AdditionalDependencies="$(INTEROP_CE200X_LIBRARY_DEPENDENCIES)"
 				OutputFile="$(OutDir)\SQLite.Interop.$(INTEROP_BUILD_NUMBER).dll"
 				Version="$(INTEROP_LINKER_VERSION)"
 				LinkIncremental="2"
@@ -428,7 +428,7 @@
 			OutputDirectory="$(ProjectDir)..\bin\$(ConfigurationYear)\$(PlatformName)\$(ConfigurationName)"
 			IntermediateDirectory="..\obj\$(ConfigurationYear)\$(PlatformName)\$(ConfigurationName)"
 			ConfigurationType="2"
-			InheritedPropertySheets=".\props\sqlite3.vsprops;.\props\SQLite.Interop.2008.vsprops;.\props\include.vsprops"
+			InheritedPropertySheets=".\props\$(ConfigurationName).vsprops;.\props\sqlite3.vsprops;.\props\SQLite.Interop.2008.vsprops;.\props\include.vsprops"
 			CharacterSet="1"
 			>
 			<Tool
@@ -476,8 +476,8 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions=" /subsystem:windowsce,5.01"
-				AdditionalLibraryDirectories="$(INTEROP_LIBRARY_DIRECTORIES)"
-				AdditionalDependencies="$(INTEROP_LIBRARY_DEPENDENCIES)"
+				AdditionalLibraryDirectories="$(INTEROP_CE200X_LIBRARY_DIRECTORIES)"
+				AdditionalDependencies="$(INTEROP_CE200X_LIBRARY_DEPENDENCIES)"
 				OutputFile="$(OutDir)\SQLite.Interop.$(INTEROP_BUILD_NUMBER).dll"
 				Version="$(INTEROP_LINKER_VERSION)"
 				LinkIncremental="1"
@@ -527,7 +527,7 @@
 			OutputDirectory="$(ProjectDir)..\bin\$(ConfigurationYear)\$(PlatformName)\$(ConfigurationName)"
 			IntermediateDirectory="..\obj\$(ConfigurationYear)\$(PlatformName)\$(ConfigurationName)"
 			ConfigurationType="2"
-			InheritedPropertySheets=".\props\sqlite3.vsprops;.\props\SQLite.Interop.2008.vsprops;.\props\include.vsprops"
+			InheritedPropertySheets=".\props\$(ConfigurationName).vsprops;.\props\sqlite3.vsprops;.\props\SQLite.Interop.2008.vsprops;.\props\include.vsprops"
 			CharacterSet="1"
 			>
 			<Tool
@@ -575,8 +575,8 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions=" /subsystem:windowsce,5.01"
-				AdditionalLibraryDirectories="$(INTEROP_LIBRARY_DIRECTORIES)"
-				AdditionalDependencies="$(INTEROP_LIBRARY_DEPENDENCIES)"
+				AdditionalLibraryDirectories="$(INTEROP_CE200X_LIBRARY_DIRECTORIES)"
+				AdditionalDependencies="$(INTEROP_CE200X_LIBRARY_DEPENDENCIES)"
 				OutputFile="$(OutDir)\SQLite.Interop.$(INTEROP_BUILD_NUMBER).dll"
 				Version="$(INTEROP_LINKER_VERSION)"
 				LinkIncremental="1"
@@ -736,6 +736,58 @@
 			</File>
 			<File
 				RelativePath=".\src\contrib\extension-functions.c"
+				>
+				<FileConfiguration
+					Name="Debug|Pocket PC 2003 (ARMV4)"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Pocket PC 2003 (ARMV4)"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug|Windows Mobile 5.0 Pocket PC SDK (ARMV4I)"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug|Windows Mobile 5.0 Smartphone SDK (ARMV4I)"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Windows Mobile 5.0 Pocket PC SDK (ARMV4I)"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Windows Mobile 5.0 Smartphone SDK (ARMV4I)"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\src\ext\compress.c"
 				>
 				<FileConfiguration
 					Name="Debug|Pocket PC 2003 (ARMV4)"
@@ -1100,6 +1152,58 @@
 			</File>
 			<File
 				RelativePath=".\src\ext\vtshim.c"
+				>
+				<FileConfiguration
+					Name="Debug|Pocket PC 2003 (ARMV4)"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Pocket PC 2003 (ARMV4)"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug|Windows Mobile 5.0 Pocket PC SDK (ARMV4I)"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug|Windows Mobile 5.0 Smartphone SDK (ARMV4I)"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Windows Mobile 5.0 Pocket PC SDK (ARMV4I)"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Windows Mobile 5.0 Smartphone SDK (ARMV4I)"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\src\ext\zipfile.c"
 				>
 				<FileConfiguration
 					Name="Debug|Pocket PC 2003 (ARMV4)"

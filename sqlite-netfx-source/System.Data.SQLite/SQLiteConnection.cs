@@ -22,6 +22,44 @@ namespace System.Data.SQLite
 
   /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#if INTEROP_CODEC || INTEROP_INCLUDE_SEE
+  /// <summary>
+  /// This enumeration is used with the
+  /// <see cref="SQLiteGetPasswordCallback" /> callback in order
+  /// to determine which of the connection string properties is
+  /// to be set with its returned string value.
+  /// </summary>
+  public enum PasswordMode
+  {
+    /// <summary>
+    /// No password mode, skip setting the password.
+    /// </summary>
+    None = 0x0,
+
+    /// <summary>
+    /// Use the "Password" connection string property.
+    /// </summary>
+    Password = 0x1000,
+
+    /// <summary>
+    /// Use the "HexPassword" connection string property.
+    /// </summary>
+    HexPassword = 0x2000,
+
+    /// <summary>
+    /// Use the "TextPassword" connection string property.
+    /// </summary>
+    TextPassword = 0x4000,
+
+    /// <summary>
+    /// Use the "TextHexPassword" connection string property.
+    /// </summary>
+    TextHexPassword = 0x8000
+  }
+#endif
+
+  /////////////////////////////////////////////////////////////////////////////////////////////////
+
   /// <summary>
   /// This class represents a single value to be returned
   /// from the <see cref="SQLiteDataReader" /> class via
@@ -627,6 +665,30 @@ namespace System.Data.SQLite
 
   /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#if INTEROP_CODEC || INTEROP_INCLUDE_SEE
+  /// <summary>
+  /// This represents a method to be called to obtain the encryption
+  /// password for the associated connection, which is passed in the
+  /// <paramref name="connection" /> parameter.
+  /// </summary>
+  /// <param name="connection">
+  /// The connection being opened.
+  /// </param>
+  /// <param name="passwordMode">
+  /// The called method may modify this parameter in order to change
+  /// which connection string property is used to setup the password.
+  /// </param>
+  /// <returns>
+  /// The password string to use when opening the connection.
+  /// </returns>
+  public delegate byte[] SQLiteGetPasswordCallback(
+      SQLiteConnection connection,  /* in */
+      ref PasswordMode passwordMode /* in, out */
+  );
+#endif
+
+  /////////////////////////////////////////////////////////////////////////////////////////////////
+
   /// <summary>
   /// This class represents the custom data type handling callbacks
   /// for a single type name.
@@ -816,6 +878,26 @@ namespace System.Data.SQLite
   public class ConnectionEventArgs : EventArgs
   {
       /// <summary>
+      /// Returns the number of instances of this class that have been created
+      /// within this application domain.
+      /// </summary>
+#if !PLATFORM_COMPACTFRAMEWORK
+      private static long createCount;
+      public static long CreateCount
+      {
+          get { return createCount; }
+      }
+#else
+      private static int createCount;
+      public static int CreateCount
+      {
+          get { return createCount; }
+      }
+#endif
+
+      /////////////////////////////////////////////////////////////////////////////////////////////
+
+      /// <summary>
       /// The type of event being raised.
       /// </summary>
       public readonly SQLiteConnectionEventType EventType;
@@ -923,6 +1005,8 @@ namespace System.Data.SQLite
           string result
           )
       {
+          Interlocked.Increment(ref createCount);
+
           EventType = eventType;
           EventArgs = eventArgs;
           Transaction = transaction;
@@ -1032,12 +1116,24 @@ namespace System.Data.SQLite
   /// <description>null</description>
   /// </item>
   /// <item>
-  /// <description>NoDefaultFlags</description>
+  /// <description>IncludeDefaultFlags</description>
   /// <description>
-  /// <b>True</b> - Do not combine the specified (or existing) connection flags with the value of the
+  /// <b>True</b> - Combine the specified connection flags, if any, with the value of the
   /// <see cref="DefaultFlags" /> property.
   /// <br/>
-  /// <b>False</b> - Combine the specified (or existing) connection flags with the value of the
+  /// <b>False</b> - Do not combine the specified connection flags, if any, with the value of the
+  /// <see cref="DefaultFlags" /> property.
+  /// </description>
+  /// <description>N</description>
+  /// <description>True</description>
+  /// </item>
+  /// <item>
+  /// <description>NoDefaultFlags</description>
+  /// <description>
+  /// <b>True</b> - Do not combine the pre-existing connection flags, if any, with the value of the
+  /// <see cref="DefaultFlags" /> property.
+  /// <br/>
+  /// <b>False</b> - Combine the pre-existing connection flags, if any, with the value of the
   /// <see cref="DefaultFlags" /> property.
   /// </description>
   /// <description>N</description>
@@ -1166,8 +1262,8 @@ namespace System.Data.SQLite
   /// <item>
   /// <description>Password</description>
   /// <description>
-  /// {password} - Using this parameter requires that the legacy CryptoAPI based
-  /// codec (or the SQLite Encryption Extension) be enabled at compile-time for
+  /// {password} - Using this parameter requires that the legacy CryptoAPI-based
+  /// (RC4) codec (or the SQLite Encryption Extension) be enabled at compile-time for
   /// both the native interop assembly and the core managed assemblies; otherwise,
   /// using this parameter may result in an exception being thrown when attempting
   /// to open the connection.
@@ -1180,7 +1276,7 @@ namespace System.Data.SQLite
   /// <description>
   /// {hexPassword} - Must contain a sequence of zero or more hexadecimal encoded
   /// byte values without a leading "0x" prefix.  Using this parameter requires
-  /// that the legacy CryptoAPI based codec (or the SQLite Encryption Extension)
+  /// that the legacy CryptoAPI-based (RC4) codec (or the SQLite Encryption Extension)
   /// be enabled at compile-time for both the native interop assembly and the
   /// core managed assemblies; otherwise, using this parameter may result in an
   /// exception being thrown when attempting to open the connection.
@@ -1191,8 +1287,8 @@ namespace System.Data.SQLite
   /// <item>
   /// <description>TextPassword</description>
   /// <description>
-  /// {password} - Using this parameter requires that the legacy CryptoAPI based
-  /// codec (or the SQLite Encryption Extension) be enabled at compile-time for
+  /// {password} - Using this parameter requires that the legacy CryptoAPI-based
+  /// (RC4) codec (or the SQLite Encryption Extension) be enabled at compile-time for
   /// both the native interop assembly and the core managed assemblies; otherwise,
   /// using this parameter may result in an exception being thrown when attempting
   /// to open the connection.
@@ -1205,7 +1301,7 @@ namespace System.Data.SQLite
   /// <description>
   /// {hexPassword} - Must contain a sequence of zero or more hexadecimal encoded
   /// byte values without a leading "0x" prefix.  Using this parameter requires
-  /// that the legacy CryptoAPI based codec (or the SQLite Encryption Extension)
+  /// that the legacy CryptoAPI-based (RC4) codec (or the SQLite Encryption Extension)
   /// be enabled at compile-time for both the native interop assembly and the
   /// core managed assemblies; otherwise, using this parameter may result in an
   /// exception being thrown when attempting to open the connection.
@@ -1380,6 +1476,16 @@ namespace System.Data.SQLite
   /// <description>3</description>
   /// </item>
   /// <item>
+  /// <description>StepRetries</description>
+  /// <description>
+  /// The maximum number of retries when stepping a SQL statement.  This
+  /// normally only applies to stepping errors resulting from the database
+  /// being locked or its schema being changed.
+  /// </description>
+  /// <description>N</description>
+  /// <description>40</description>
+  /// </item>
+  /// <item>
   /// <description>ProgressOps</description>
   /// <description>
   /// The approximate number of virtual machine instructions between progress
@@ -1448,6 +1554,7 @@ namespace System.Data.SQLite
     private const int DefaultBusyTimeout = 0;
     private const int DefaultWaitTimeout = 30000;
     private const bool DefaultNoDefaultFlags = false;
+    private const bool DefaultIncludeDefaultFlags = true;
     private const bool DefaultNoSharedFlags = false;
     private const bool DefaultFailIfMissing = false;
     private const bool DefaultReadOnly = false;
@@ -1525,6 +1632,26 @@ namespace System.Data.SQLite
     /// Used to hold the active library version number of SQLite.
     /// </summary>
     private static int _versionNumber;
+#endif
+
+    /// <summary>
+    /// Used to hold the number of times the <see cref="Changed" /> event
+    /// should have been fired.
+    /// </summary>
+#if !PLATFORM_COMPACTFRAMEWORK
+    private static long _onChangedHit;
+#else
+    private static int _onChangedHit;
+#endif
+
+    /// <summary>
+    /// Used to hold the number of times the <see cref="Changed" /> event
+    /// should have been skipped.
+    /// </summary>
+#if !PLATFORM_COMPACTFRAMEWORK
+    private static long _onChangedMiss;
+#else
+    private static int _onChangedMiss;
 #endif
     #endregion
 
@@ -2144,6 +2271,68 @@ namespace System.Data.SQLite
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
     /// <summary>
+    /// Attempts to determine if <see cref="Changed" /> events can be
+    /// raised.
+    /// </summary>
+    /// <param name="connection">
+    /// The connection associated with this event, if any.
+    /// </param>
+    /// <param name="ignoreDisposed">
+    /// Non-zero if disposal status of the specified connection should
+    /// not be considered.
+    /// </param>
+    /// <returns>
+    /// Non-zero if <see cref="Changed" /> events are currently enabled
+    /// for the specified connection; otherwise, zero.
+    /// </returns>
+    internal static bool CanOnChanged(
+        SQLiteConnection connection,
+        bool ignoreDisposed
+        )
+    {
+        if (connection != null)
+        {
+            bool disposed = connection.disposed;
+
+            if (!ignoreDisposed && disposed)
+            {
+                Interlocked.Increment(ref _onChangedMiss);
+                return false;
+            }
+
+#if !PLATFORM_COMPACTFRAMEWORK
+            if (!disposed && !connection.CanRaiseEvents)
+            {
+                Interlocked.Increment(ref _onChangedMiss);
+                return false;
+            }
+#endif
+        }
+
+        //
+        // BUGFIX: *PERF* If there are no event handlers, we do not
+        //         attempt to handle any events -AND- skip creating
+        //         data for event arguments.  This should minimize
+        //         "wasted" heap allocations.
+        //
+        lock (_syncRoot)
+        {
+            if (_handlers != null)
+            {
+                Interlocked.Increment(ref _onChangedHit);
+                return true;
+            }
+            else
+            {
+                Interlocked.Increment(ref _onChangedMiss);
+                return false;
+            }
+        }
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    /// <summary>
     /// Raises the <see cref="Changed" /> event.
     /// </summary>
     /// <param name="connection">
@@ -2159,14 +2348,6 @@ namespace System.Data.SQLite
         ConnectionEventArgs e
         )
     {
-#if !PLATFORM_COMPACTFRAMEWORK
-        if ((connection != null) &&
-            !connection.disposed && !connection.CanRaiseEvents)
-        {
-            return;
-        }
-#endif
-
         SQLiteConnectionEventHandler handlers;
 
         lock (_syncRoot)
@@ -2258,10 +2439,13 @@ namespace System.Data.SQLite
 
         if (result != null)
         {
-            SQLiteConnection.OnChanged(null, new ConnectionEventArgs(
-                SQLiteConnectionEventType.NewCriticalHandle, null,
-                null, null, null, result, null, new object[] {
-                typeof(SQLiteConnection), nativeHandle }));
+            if (CanOnChanged(null, false))
+            {
+                OnChanged(null, new ConnectionEventArgs(
+                    SQLiteConnectionEventType.NewCriticalHandle, null,
+                    null, null, null, result, null, new object[] {
+                    typeof(SQLiteConnection), nativeHandle }));
+            }
         }
 
         return result;
@@ -3116,21 +3300,24 @@ namespace System.Data.SQLite
     /// </param>
     protected override void Dispose(bool disposing)
     {
-        OnChanged(this, new ConnectionEventArgs(
-            disposing ?
-                SQLiteConnectionEventType.DisposingConnection :
-                SQLiteConnectionEventType.FinalizingConnection,
-            null, null, null, null, null, null, null));
+        if (CanOnChanged(this, false))
+        {
+            OnChanged(this, new ConnectionEventArgs(
+                disposing ?
+                    SQLiteConnectionEventType.DisposingConnection :
+                    SQLiteConnectionEventType.FinalizingConnection,
+                null, null, null, null, null, null, null));
+        }
 
 #if !NET_COMPACT_20 && TRACE_WARNING
         if (HelperMethods.HasFlags(_flags, SQLiteConnectionFlags.TraceWarning))
         {
             if (_noDispose)
             {
-                System.Diagnostics.Trace.WriteLine(HelperMethods.StringFormat(
+                HelperMethods.Trace(HelperMethods.StringFormat(
                     CultureInfo.CurrentCulture,
                     "WARNING: Disposing of connection \"{0}\" with the no-dispose flag set.",
-                    _connectionString));
+                    _connectionString), TraceCategory.Warning);
             }
         }
 #endif
@@ -3164,11 +3351,14 @@ namespace System.Data.SQLite
             //
             disposed = true;
 
-            OnChanged(this, new ConnectionEventArgs(
-                disposing ?
-                    SQLiteConnectionEventType.DisposedConnection :
-                    SQLiteConnectionEventType.FinalizedConnection,
-                null, null, null, null, null, null, null));
+            if (CanOnChanged(this, true))
+            {
+                OnChanged(this, new ConnectionEventArgs(
+                    disposing ?
+                        SQLiteConnectionEventType.DisposedConnection :
+                        SQLiteConnectionEventType.FinalizedConnection,
+                    null, null, null, null, null, null, null));
+            }
         }
     }
     #endregion
@@ -3353,9 +3543,12 @@ namespace System.Data.SQLite
               this, isolationLevel != ImmediateIsolationLevel);
       }
 
-      OnChanged(this, new ConnectionEventArgs(
-          SQLiteConnectionEventType.NewTransaction, null, transaction,
-          null, null, null, null, null));
+      if (CanOnChanged(this, false))
+      {
+          OnChanged(this, new ConnectionEventArgs(
+              SQLiteConnectionEventType.NewTransaction, null, transaction,
+              null, null, null, null, null));
+      }
 
       return transaction;
     }
@@ -3369,9 +3562,12 @@ namespace System.Data.SQLite
     {
       CheckDisposed();
 
-      OnChanged(this, new ConnectionEventArgs(
-          SQLiteConnectionEventType.ChangeDatabase, null, null, null, null,
-          null, databaseName, null));
+      if (CanOnChanged(this, false))
+      {
+          OnChanged(this, new ConnectionEventArgs(
+              SQLiteConnectionEventType.ChangeDatabase, null, null, null, null,
+              null, databaseName, null));
+      }
 
       throw new NotImplementedException(); // NOTE: For legacy compatibility.
     }
@@ -3386,9 +3582,12 @@ namespace System.Data.SQLite
       if (Object.ReferenceEquals(_lastConnectionInOpen, this))
           _lastConnectionInOpen = null; /* THREAD-SAFE: per-thread datum. */
 
-      OnChanged(this, new ConnectionEventArgs(
-          SQLiteConnectionEventType.Closing, null, null, null, null, null,
-          null, null));
+      if (CanOnChanged(this, false))
+      {
+          OnChanged(this, new ConnectionEventArgs(
+              SQLiteConnectionEventType.Closing, null, null, null, null, null,
+              null, null));
+      }
 
       if (_sql != null)
       {
@@ -3441,17 +3640,23 @@ namespace System.Data.SQLite
       }
       else
       {
-          OnChanged(this, new ConnectionEventArgs(
-              SQLiteConnectionEventType.NothingToDo,
-              null, null, null, null, null, null, null));
+          if (CanOnChanged(this, false))
+          {
+              OnChanged(this, new ConnectionEventArgs(
+                  SQLiteConnectionEventType.NothingToDo,
+                  null, null, null, null, null, null, null));
+          }
       }
 
       StateChangeEventArgs eventArgs = null;
       OnStateChange(ConnectionState.Closed, ref eventArgs);
 
-      OnChanged(this, new ConnectionEventArgs(
-          SQLiteConnectionEventType.Closed, eventArgs, null, null, null,
-          null, null, null));
+      if (CanOnChanged(this, false))
+      {
+          OnChanged(this, new ConnectionEventArgs(
+              SQLiteConnectionEventType.Closed, eventArgs, null, null, null,
+              null, null, null));
+      }
     }
 
     /// <summary>
@@ -4006,9 +4211,12 @@ namespace System.Data.SQLite
                 GetFallbackDefaultIsolationLevel(), strictEnlistment,
                 strictEnlistment);
 
-            OnChanged(this, new ConnectionEventArgs(
-                SQLiteConnectionEventType.EnlistTransaction, null, null, null, null,
-                null, null, new object[] { _enlistment }));
+            if (CanOnChanged(this, false))
+            {
+                OnChanged(this, new ConnectionEventArgs(
+                    SQLiteConnectionEventType.EnlistTransaction, null, null, null, null,
+                    null, null, new object[] { _enlistment }));
+            }
         }
     }
 #endif
@@ -4620,6 +4828,84 @@ namespace System.Data.SQLite
         }
     }
 
+#if INTEROP_CODEC || INTEROP_INCLUDE_SEE
+    /// <summary>
+    /// Gets or sets the callback method that can be used to provide a
+    /// connection string password when one is NOT already specified in
+    /// the connection string itself.
+    /// </summary>
+    private SQLiteGetPasswordCallback _getPasswordCallback;
+    public SQLiteGetPasswordCallback GetPasswordCallback
+    {
+        get { CheckDisposed(); return _getPasswordCallback; }
+        set { CheckDisposed(); _getPasswordCallback = value; }
+    }
+#endif
+
+    /// <summary>
+    /// Attempts to serialize the specified (or default)
+    /// <paramref name="schema" /> of the current database and
+    /// returns the resulting byte array.
+    /// </summary>
+    /// <param name="schema">
+    /// The name of the database schema (e.g. "main") to attempt to
+    /// serialize.  This parameter may be null.
+    /// </param>
+    /// <returns>
+    /// The raw database bytes, which may later be passed to the
+    /// <see cref="Deserialize" /> method.
+    /// </returns>
+    public byte[] Serialize(
+        string schema
+        )
+    {
+        CheckDisposed();
+
+        if (_sql == null)
+        {
+            throw new InvalidOperationException(
+                "Database connection not valid for serialization.");
+        }
+
+        return _sql.Serialize(schema);
+    }
+
+    /// <summary>
+    /// Attempts to deserialize into the specified (or default)
+    /// <paramref name="schema" /> of the current database, based
+    /// on the <paramref name="data" /> raw database bytes, and
+    /// then makes the resulting in-memory database accessible.
+    /// </summary>
+    /// <param name="schema">
+    /// The name of the schema to deserialize the raw database
+    /// bytes into.
+    /// </param>
+    /// <param name="data">
+    /// The raw database bytes.  This parameter must have been
+    /// obtained form the <see cref="Serialize" /> method -AND-
+    /// may not be null.
+    /// </param>
+    /// <param name="readOnly">
+    /// Non-zero if the resulting in-memory database should be
+    /// read-only.
+    /// </param>
+    public void Deserialize(
+        string schema,
+        byte[] data,
+        bool readOnly
+        )
+    {
+        CheckDisposed();
+
+        if (_sql == null)
+        {
+            throw new InvalidOperationException(
+                "Database connection not valid for deserialization.");
+        }
+
+        _sql.Deserialize(schema, data, readOnly);
+    }
+
     /// <summary>
     /// Opens the connection using the parameters found in the <see cref="ConnectionString" />.
     /// </summary>
@@ -4629,22 +4915,28 @@ namespace System.Data.SQLite
 
       _lastConnectionInOpen = this; /* THREAD-SAFE: per-thread datum. */
 
-      OnChanged(this, new ConnectionEventArgs(
-          SQLiteConnectionEventType.Opening, null, null, null, null, null,
-          null, null));
+      if (CanOnChanged(this, false))
+      {
+          OnChanged(this, new ConnectionEventArgs(
+              SQLiteConnectionEventType.Opening, null, null, null, null, null,
+              null, null));
+      }
 
       if (_connectionState != ConnectionState.Closed)
         throw new InvalidOperationException();
 
       Close();
 
-      ConnectionEventArgs previewEventArgs = new ConnectionEventArgs(
-          SQLiteConnectionEventType.ConnectionStringPreview,
-          null, null, null, null, null, null, null, null);
+      if (CanOnChanged(this, false))
+      {
+          ConnectionEventArgs previewEventArgs = new ConnectionEventArgs(
+              SQLiteConnectionEventType.ConnectionStringPreview,
+              null, null, null, null, null, null, null, null);
 
-      previewEventArgs.Result = _connectionString;
-      OnChanged(this, previewEventArgs);
-      _connectionString = previewEventArgs.Result;
+          previewEventArgs.Result = _connectionString;
+          OnChanged(this, previewEventArgs);
+          _connectionString = previewEventArgs.Result;
+      }
 
       SortedList<string, string> opts = ParseConnectionString(
           this, _connectionString, _parseViaFramework, false, false);
@@ -4672,11 +4964,19 @@ namespace System.Data.SQLite
       //         manually set by the application.
       //
       bool noDefaultFlags = SQLiteConvert.ToBoolean(FindKey(opts, "NoDefaultFlags", DefaultNoDefaultFlags.ToString()));
+      bool includeDefaultFlags = SQLiteConvert.ToBoolean(FindKey(opts, "IncludeDefaultFlags", DefaultIncludeDefaultFlags.ToString()));
 
       if (enumValue is SQLiteConnectionFlags)
+      {
           _flags |= (SQLiteConnectionFlags)enumValue;
+
+          if (includeDefaultFlags)
+              _flags |= DefaultFlags;
+      }
       else if (!noDefaultFlags)
+      {
           _flags |= DefaultFlags;
+      }
 
       bool noSharedFlags = SQLiteConvert.ToBoolean(FindKey(opts, "NoSharedFlags", DefaultNoSharedFlags.ToString()));
       if (!noSharedFlags) { lock (_syncRoot) { _flags |= _sharedFlags; } }
@@ -4732,9 +5032,12 @@ namespace System.Data.SQLite
       }
 #endif
 
-      OnChanged(this, new ConnectionEventArgs(
-          SQLiteConnectionEventType.ConnectionString, null, null, null, null,
-          null, eventArgConnectionString, new object[] { eventArgOpts }));
+      if (CanOnChanged(this, false))
+      {
+          OnChanged(this, new ConnectionEventArgs(
+              SQLiteConnectionEventType.ConnectionString, null, null, null, null,
+              null, eventArgConnectionString, new object[] { eventArgOpts }));
+      }
 
       stringValue = FindKey(opts, "DefaultDbType", null);
 
@@ -4758,11 +5061,6 @@ namespace System.Data.SQLite
 
       if (stringValue != null)
         _defaultTypeName = stringValue;
-
-      stringValue = FindKey(opts, "VfsName", null);
-
-      if (stringValue != null)
-        _vfsName = stringValue;
 
 #if !NET_COMPACT_20 && TRACE_WARNING
       bool uri = false;
@@ -4833,12 +5131,12 @@ namespace System.Data.SQLite
               fileName.StartsWith("\\", StringComparison.OrdinalIgnoreCase) &&
               !fileName.StartsWith("\\\\", StringComparison.OrdinalIgnoreCase))
           {
-              System.Diagnostics.Trace.WriteLine(HelperMethods.StringFormat(
+              HelperMethods.Trace(HelperMethods.StringFormat(
                   CultureInfo.CurrentCulture,
                   "WARNING: Detected a possibly malformed UNC database file name \"{0}\" that " +
                   "may have originally started with two backslashes; however, four leading " +
                   "backslashes may be required, e.g.: \"Data Source=\\\\\\{0};\"",
-                  fileName));
+                  fileName), TraceCategory.Warning);
           }
       }
 #endif
@@ -4923,6 +5221,9 @@ namespace System.Data.SQLite
             SetupSQLiteBase(opts);
         }
 
+        stringValue = FindKey(opts, "VfsName", null);
+
+        string vfsName = (stringValue != null) ? vfsName = stringValue : vfsName = _vfsName;
         SQLiteOpenFlagsEnum flags = SQLiteOpenFlagsEnum.None;
 
         if (!SQLiteConvert.ToBoolean(FindKey(opts, "FailIfMissing", DefaultFailIfMissing.ToString())))
@@ -4942,7 +5243,7 @@ namespace System.Data.SQLite
         if (fullUri)
             flags |= SQLiteOpenFlagsEnum.Uri;
 
-        _sql.Open(fileName, _vfsName, _flags, flags, maxPoolSize, usePooling);
+        _sql.Open(fileName, vfsName, _flags, flags, maxPoolSize, usePooling);
 
         stringValue = FindKey(opts, "BinaryGUID", null);
 
@@ -4958,6 +5259,7 @@ namespace System.Data.SQLite
             byte[] textHexPasswordBytes;
 
             error = null;
+
             textHexPasswordBytes = FromHexString(textHexPassword, false, ref error);
 
             if (textHexPasswordBytes == null)
@@ -4998,6 +5300,7 @@ namespace System.Data.SQLite
                     byte[] hexPasswordBytes;
 
                     error = null;
+
                     hexPasswordBytes = FromHexString(hexPassword, true, ref error);
 
                     if (hexPasswordBytes == null)
@@ -5029,6 +5332,61 @@ namespace System.Data.SQLite
                     {
                         _sql.SetPassword(_password, _passwordWasText);
                     }
+                    else if (_getPasswordCallback != null)
+                    {
+                        byte[] passwordBytes;
+                        PasswordMode passwordMode = PasswordMode.Password;
+
+                        passwordBytes = _getPasswordCallback(this, ref passwordMode);
+
+                        switch (passwordMode)
+                        {
+                            case PasswordMode.None:
+                                {
+                                    //
+                                    // NOTE: Do nothing, ignore password.
+                                    //
+                                    break;
+                                }
+                            case PasswordMode.Password:
+                                {
+                                    _sql.SetPassword(passwordBytes, false);
+                                    _passwordWasText = false;
+                                    _passwordWasHex = false;
+                                    break;
+                                }
+                            case PasswordMode.HexPassword:
+                                {
+                                    _sql.SetPassword(passwordBytes, false);
+                                    _passwordWasText = false;
+                                    _passwordWasHex = true;
+                                    break;
+                                }
+                            case PasswordMode.TextPassword:
+                                {
+                                    Array.Resize(
+                                        ref passwordBytes, passwordBytes.Length + 1);
+
+                                    _sql.SetPassword(passwordBytes, true);
+                                    _passwordWasText = true;
+                                    _passwordWasHex = false;
+                                    break;
+                                }
+                            case PasswordMode.TextHexPassword:
+                                {
+                                    Array.Resize(
+                                        ref passwordBytes, passwordBytes.Length + 1);
+
+                                    _sql.SetPassword(passwordBytes, true);
+                                    _passwordWasText = true;
+                                    _passwordWasHex = true;
+                                    break;
+                                }
+                        }
+
+                        Array.Clear(passwordBytes, 0, passwordBytes.Length);
+                        passwordBytes = null;
+                    }
 
                     password = null; /* IMMUTABLE */
                 }
@@ -5056,6 +5414,7 @@ namespace System.Data.SQLite
             _connectionString = BuildConnectionString(opts);
         }
 #else
+
         if (FindKey(opts, "TextHexPassword", null) != null)
         {
             throw new SQLiteException(SQLiteErrorCode.Error,
@@ -5257,9 +5616,12 @@ namespace System.Data.SQLite
           StateChangeEventArgs eventArgs = null;
           OnStateChange(ConnectionState.Open, ref eventArgs);
 
-          OnChanged(this, new ConnectionEventArgs(
-              SQLiteConnectionEventType.Opened, eventArgs, null, null, null,
-              null, eventArgConnectionString, new object[] { eventArgOpts }));
+          if (CanOnChanged(this, false))
+          {
+              OnChanged(this, new ConnectionEventArgs(
+                  SQLiteConnectionEventType.Opened, eventArgs, null, null, null,
+                  null, eventArgConnectionString, new object[] { eventArgOpts }));
+          }
 
 #if DEBUG
           _debugString = HelperMethods.StringFormat(
@@ -5496,9 +5858,12 @@ namespace System.Data.SQLite
 
         _sql.Cancel(); /* throw */
 
-        OnChanged(this, new ConnectionEventArgs(
-            SQLiteConnectionEventType.Canceled,
-            null, null, null, null, null, null, null));
+        if (CanOnChanged(this, false))
+        {
+            OnChanged(this, new ConnectionEventArgs(
+                SQLiteConnectionEventType.Canceled,
+                null, null, null, null, null, null, null));
+        }
     }
 
     /// <summary>
@@ -5723,13 +6088,13 @@ namespace System.Data.SQLite
     }
 
     /// <summary>
-    /// Returns a string containing the define constants (i.e. compile-time
-    /// options) used to compile the core managed assembly, delimited with
-    /// spaces.
+    /// Returns a string containing the list of unified define constants
+    /// (i.e. compile-time options) used to compile the core managed and
+    /// interop assemblies, delimited with spaces.
     /// </summary>
     public static string DefineConstants
     {
-        get { return SQLite3.DefineConstants; }
+      get { return SQLite3.DefineConstants; }
     }
 
     /// <summary>
@@ -5756,7 +6121,7 @@ namespace System.Data.SQLite
     /// </summary>
     public static string SQLiteCompileOptions
     {
-        get { return SQLite3.SQLiteCompileOptions; }
+      get { return SQLite3.SQLiteCompileOptions; }
     }
 
     /// <summary>
@@ -5788,7 +6153,7 @@ namespace System.Data.SQLite
     /// </summary>
     public static string InteropCompileOptions
     {
-        get { return SQLite3.InteropCompileOptions; }
+      get { return SQLite3.InteropCompileOptions; }
     }
 
     /// <summary>
@@ -5858,6 +6223,18 @@ namespace System.Data.SQLite
                 return null;
             }
         }
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    /// <summary>
+    /// Returns a string containing the define constants (i.e. compile-time
+    /// options) used to compile the core managed assembly, delimited with
+    /// spaces.
+    /// </summary>
+    public static string ProviderDefineConstants
+    {
+      get { return SQLite3.ProviderDefineConstants; }
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -5968,6 +6345,18 @@ namespace System.Data.SQLite
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
+    private object _tag;
+    /// <summary>
+    /// Gets or sets an arbitrary data ("tag") associated with this connection instance.
+    /// </summary>
+    public object Tag
+    {
+        get { CheckDisposed(); return _tag; }
+        set { CheckDisposed(); _tag = value; }
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
     /// <summary>
     /// Returns the state of the connection.
     /// </summary>
@@ -6003,9 +6392,10 @@ namespace System.Data.SQLite
 
 #if !NET_COMPACT_20 && TRACE_CONNECTION
         if (rc != SQLiteErrorCode.Ok)
-            System.Diagnostics.Trace.WriteLine(HelperMethods.StringFormat(
+            HelperMethods.Trace(HelperMethods.StringFormat(
                 CultureInfo.CurrentCulture,
-                "Shutdown (Instance) Failed: {0}", rc));
+                "Shutdown (Instance) Failed: {0}", rc),
+                TraceCategory.Connection);
 #endif
 
         return rc;
@@ -6033,9 +6423,10 @@ namespace System.Data.SQLite
         if (rc != SQLiteErrorCode.Ok)
         {
 #if !NET_COMPACT_20 && TRACE_CONNECTION
-            System.Diagnostics.Trace.WriteLine(HelperMethods.StringFormat(
+            HelperMethods.Trace(HelperMethods.StringFormat(
                 CultureInfo.CurrentCulture,
-                "Shutdown (Static) Failed: {0}", rc));
+                "Shutdown (Static) Failed: {0}", rc),
+                TraceCategory.Connection);
 #endif
 
             if (!noThrow)

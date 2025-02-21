@@ -1,0 +1,154 @@
+###############################################################################
+#
+# pst-25cafb35e5.eagle --
+#
+# Written by Joe Mistachkin.
+# Released to the public domain, use at your own risk!
+#
+###############################################################################
+
+package require Eagle
+package require Eagle.Library
+package require Eagle.Test
+
+runTestPrologue
+
+###############################################################################
+
+package require System.Data.SQLite.Test
+runSQLiteTestPrologue
+
+###############################################################################
+
+proc getChangedCounts {} {
+  return [list \
+      hit [object invoke -flags +NonPublic \
+          System.Data.SQLite.SQLiteConnection \
+          _onChangedHit] \
+      miss [object invoke -flags +NonPublic \
+          System.Data.SQLite.SQLiteConnection \
+          _onChangedMiss] \
+      data [object invoke \
+          System.Data.SQLite.ConnectionEventArgs \
+          CreateCount]]
+}
+
+###############################################################################
+
+proc subtractChangedCounts { dict1 dict2 } {
+  set result [list]
+
+  foreach name [list hit miss data] {
+    set count1 [getDictionaryValue $dict1 $name]
+    set count2 [getDictionaryValue $dict2 $name]
+
+    lappend result $name [expr {$count2 - $count1}]
+  }
+
+  return $result
+}
+
+###############################################################################
+
+collectGarbage $test_channel
+
+###############################################################################
+
+runTest {test pst-25cafb35e5-1.1 {without Changed events} -body {
+  set result [list]
+  set counts(before) [getChangedCounts]
+
+  setupDb [set fileName pst-25cafb35e5-1.1.db]
+
+  sql execute $db {
+    CREATE TABLE t1(x TEXT);
+    INSERT INTO t1 (x) VALUES('1');
+    INSERT INTO t1 (x) VALUES('2');
+    INSERT INTO t1 (x) VALUES('3');
+  }
+
+  lappend result [sql execute -execute reader -format list -- \
+      $db {SELECT x FROM t1 ORDER BY x;}]
+
+  cleanupDb $fileName
+  collectGarbage $test_channel
+
+  set counts(after) [getChangedCounts]
+
+  list $result [subtractChangedCounts $counts(before) $counts(after)]
+} -cleanup {
+  cleanupDb $fileName
+
+  unset -nocomplain result counts fileName
+} -constraints {eagle command.object monoBug28 command.sql compile.DATA SQLite\
+System.Data.SQLite} -result {{{1 2 3}} {hit 0 miss 48 data 0}}}
+
+###############################################################################
+
+runTest {test pst-25cafb35e5-1.2 {with Changed events} -setup {
+  proc onChanged { sender e } {
+    #
+    # NOTE: For the purposes of this issue, there isn't a pressing
+    #       need to do anything specific here; however, keep track
+    #       of the event type for additional verification that the
+    #       correct set of event types is still being fired.
+    #
+    lappend ::result [$e EventType]
+  }
+
+  set callback onChanged
+  object invoke System.Data.SQLite.SQLiteConnection add_Changed $callback
+} -body {
+  set result [list]
+  set counts(before) [getChangedCounts]
+
+  setupDb [set fileName pst-25cafb35e5-1.2.db]
+
+  sql execute $db {
+    CREATE TABLE t1(x TEXT);
+    INSERT INTO t1 (x) VALUES('1');
+    INSERT INTO t1 (x) VALUES('2');
+    INSERT INTO t1 (x) VALUES('3');
+  }
+
+  lappend result [sql execute -execute reader -format list -- \
+      $db {SELECT x FROM t1 ORDER BY x;}]
+
+  cleanupDb $fileName
+  collectGarbage $test_channel
+
+  set counts(after) [getChangedCounts]
+
+  list $result [subtractChangedCounts $counts(before) $counts(after)]
+} -cleanup {
+  object invoke System.Data.SQLite.SQLiteConnection remove_Changed $callback
+  catch {object removecallback $callback}
+
+  cleanupDb $fileName
+
+  unset -nocomplain callback result counts fileName
+
+  rename onChanged ""
+} -constraints {eagle command.object monoBug28 command.sql compile.DATA SQLite\
+System.Data.SQLite} -result {{Opening Closing NothingToDo Closed\
+ConnectionStringPreview ConnectionString NewCriticalHandle NewCommand\
+DisposingCommand Opened NewCommand SqlStringPreview NewDataReader\
+NewCriticalHandle DataReaderPreview DataReaderPreview DisposingDataReader\
+ClosingDataReader DataReaderPreview DisposingCommand NewCommand\
+SqlStringPreview NewDataReader NewCriticalHandle NewCriticalHandle\
+NewCriticalHandle NewCriticalHandle DataReaderPreview DataReaderPreview\
+DisposingDataReader ClosingDataReader DataReaderPreview DisposingCommand\
+NewCommand SqlStringPreview NewDataReader NewCriticalHandle DataReaderPreview\
+ClosingDataReader DataReaderPreview DisposingCommand {1 2 3} Closing Closed\
+FinalizingConnection Closing NothingToDo Closed FinalizedConnection} {hit 48\
+miss 0 data 48}}}
+
+###############################################################################
+
+rename subtractChangedCounts ""
+rename getChangedCounts ""
+
+###############################################################################
+
+runSQLiteTestEpilogue
+runTestEpilogue

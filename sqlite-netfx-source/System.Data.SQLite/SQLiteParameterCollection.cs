@@ -84,6 +84,18 @@ namespace System.Data.SQLite
     }
 
     /// <summary>
+    /// Gets or sets the case-insensitivity setting for use when mappping
+    /// parameters.  This should only be set immediately after creating a
+    /// <see cref="SQLiteParameterCollection" /> instance.
+    /// </summary>
+    private bool noCase;
+    public bool NoCase
+    {
+      get { return noCase; }
+      set { noCase = value; }
+    }
+
+    /// <summary>
     /// Retrieves an enumerator for the collection
     /// </summary>
     /// <returns>An enumerator for the underlying array</returns>
@@ -318,13 +330,23 @@ namespace System.Data.SQLite
     /// <returns>-1 if not found, otherwise a zero-based index of the parameter</returns>
     public override int IndexOf(string parameterName)
     {
-      int x = _parameterList.Count;
-      for (int n = 0; n < x; n++)
-      {
-        if (String.Compare(parameterName, _parameterList[n].ParameterName, StringComparison.Ordinal) == 0)
-          return n;
-      }
-      return -1;
+        StringComparison comparisonType = noCase ?
+            StringComparison.OrdinalIgnoreCase :
+            StringComparison.Ordinal;
+
+        int x = _parameterList.Count;
+
+        for (int n = 0; n < x; n++)
+        {
+            if (String.Compare(parameterName,
+                _parameterList[n].ParameterName,
+                comparisonType) == 0)
+            {
+                return n;
+            }
+        }
+
+        return -1;
     }
 
     /// <summary>
@@ -423,11 +445,11 @@ namespace System.Data.SQLite
 
       foreach(SQLiteParameter p in _parameterList)
       {
-        y ++;
+        y++;
         s = p.ParameterName;
-        if (s == null)
+        if (String.IsNullOrEmpty(s))
         {
-          s = HelperMethods.StringFormat(CultureInfo.InvariantCulture, ";{0}", nUnnamed);
+          s = SQLiteParameter.CreateNameForIndex(nUnnamed, true);
           nUnnamed++;
         }
 
@@ -446,7 +468,7 @@ namespace System.Data.SQLite
           if (stmt == null) stmt = _command._statementList[n];
           if (stmt._paramNames != null)
           {
-            if (stmt.MapParameter(s, p) == true)
+            if (stmt.MapParameter(s, p, noCase) == true)
               isMapped = true;
           }
           stmt = null;
@@ -456,7 +478,7 @@ namespace System.Data.SQLite
         // the parameter by its index in the collection
         if (isMapped == false)
         {
-          s = HelperMethods.StringFormat(CultureInfo.InvariantCulture, ";{0}", y);
+          s = SQLiteParameter.CreateNameForIndex(y, true);
 
           stmt = activeStatement;
           for (n = 0; n < x; n++)
@@ -464,8 +486,11 @@ namespace System.Data.SQLite
             if (stmt == null) stmt = _command._statementList[n];
             if (stmt._paramNames != null)
             {
-              if (stmt.MapParameter(s, p) == true)
+              if (stmt.MapParameter(s, p, noCase) ||
+                  stmt.MapUnnamedParameter(s, p, noCase))
+              {
                 isMapped = true;
+              }
             }
             stmt = null;
           }

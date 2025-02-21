@@ -100,6 +100,7 @@ IoErr_Dir_Fsync 1290
 IoErr_Fstat 1802
 IoErr_Fsync 1034
 IoErr_GetTempPath 6410
+IoErr_In_Page 8714
 IoErr_Lock 3850
 IoErr_Mmap 6154
 IoErr_NoMem 3082

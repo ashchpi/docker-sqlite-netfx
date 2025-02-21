@@ -839,6 +839,54 @@ namespace System.Data.SQLite
     }
 
     /// <summary>
+    /// Build list-formatted string from a list of string elements.
+    /// </summary>
+    /// <param name="list">
+    /// The list of strings to process.
+    /// </param>
+    /// <param name="emptyOnNull">
+    /// Non-zero if this method should avoid returning a null value
+    /// when the input list is null.
+    /// </param>
+    /// <returns>
+    /// Either the list-formatted string -OR- null if it cannot be
+    /// determined.
+    /// </returns>
+    internal static string ToString(
+        IList<string> list,
+        bool emptyOnNull
+        )
+    {
+        StringBuilder result;
+
+        if (list != null)
+        {
+            result = new StringBuilder();
+
+            foreach (string element in list)
+            {
+                if (element == null)
+                    continue;
+
+                if (result.Length > 0)
+                    result.Append(' ');
+
+                result.Append(element);
+            }
+        }
+        else if (emptyOnNull)
+        {
+            result = new StringBuilder();
+        }
+        else
+        {
+            result = null;
+        }
+
+        return (result != null) ? result.ToString() : null;
+    }
+
+    /// <summary>
     /// Converts a string into a DateTime, using the DateTimeFormat, DateTimeKind,
     /// and DateTimeFormatString specified for the connection when it was opened.
     /// </summary>
@@ -1323,20 +1371,29 @@ namespace System.Data.SQLite
     };
 
     /// <summary>
-    /// For a given intrinsic type, return a DbType
+    /// Attempt to convert the specified <see cref="Type" /> to a
+    /// <see cref="DbType" /> suitable for use with this library.
     /// </summary>
-    /// <param name="typ">The native type to convert</param>
-    /// <returns>The corresponding (closest match) DbType</returns>
-    internal static DbType TypeToDbType(Type typ)
+    /// <param name="type">
+    /// The type to convert.
+    /// </param>
+    /// <returns>
+    /// Either a specific <see cref="DbType" /> -OR- the default
+    /// <see cref="DbType" /> (i.e. <see cref="DbType.String" />)
+    /// if a more specific <see cref="DbType" /> is not matched.
+    /// </returns>
+    public static DbType TypeToDbType(Type type)
     {
-      TypeCode tc = Type.GetTypeCode(typ);
-      if (tc == TypeCode.Object)
-      {
-        if (typ == typeof(byte[])) return DbType.Binary;
-        if (typ == typeof(Guid)) return DbType.Guid;
-        return DbType.String;
-      }
-      return _typetodbtype[(int)tc];
+        TypeCode typeCode = Type.GetTypeCode(type);
+
+        if (typeCode == TypeCode.Object)
+        {
+            if (type == typeof(byte[])) return DbType.Binary;
+            if (type == typeof(Guid)) return DbType.Guid;
+            return DbType.String;
+        }
+
+        return _typetodbtype[(int)typeCode];
     }
 
     private static DbType[] _typetodbtype = {
@@ -1543,10 +1600,10 @@ namespace System.Data.SQLite
     {
         if (HelperMethods.HasFlags(flags, SQLiteConnectionFlags.TraceWarning))
         {
-            Trace.WriteLine(HelperMethods.StringFormat(
+            HelperMethods.Trace(HelperMethods.StringFormat(
                 CultureInfo.CurrentCulture,
                 "WARNING: Type mapping failed, returning default name \"{0}\" for type {1}.",
-                typeName, dbType));
+                typeName, dbType), TraceCategory.Warning);
         }
     }
 
@@ -1572,10 +1629,10 @@ namespace System.Data.SQLite
         if (!String.IsNullOrEmpty(typeName) &&
             HelperMethods.HasFlags(flags, SQLiteConnectionFlags.TraceWarning))
         {
-            Trace.WriteLine(HelperMethods.StringFormat(
+            HelperMethods.Trace(HelperMethods.StringFormat(
                 CultureInfo.CurrentCulture,
                 "WARNING: Type mapping failed, returning default type {0} for name \"{1}\".",
-                dbType, typeName));
+                dbType, typeName), TraceCategory.Warning);
         }
     }
 #endif
@@ -2410,7 +2467,13 @@ namespace System.Data.SQLite
       /// <summary>
       /// The <see cref="SQLiteConnection.Cancel" /> method was invoked.
       /// </summary>
-      Canceled = 24
+      Canceled = 24,
+
+      /// <summary>
+      /// The <see cref="SQLiteDataReader" /> is preparing to return
+      /// a row of data.
+      /// </summary>
+      DataReaderPreview = 25
   }
 
   /// <summary>

@@ -141,7 +141,7 @@ int errno;
 #ifndef _MAP_H_
 #define _MAP_H_
 
-#if defined(_WIN32)
+#if defined(_WIN32) && (!defined(_MSC_VER) || _MSC_VER < 1600)
 typedef signed char int8_t;
 typedef unsigned char uint8_t;
 typedef signed int int16_t;

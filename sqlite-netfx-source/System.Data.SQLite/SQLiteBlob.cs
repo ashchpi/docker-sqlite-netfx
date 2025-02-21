@@ -160,10 +160,13 @@ namespace System.Data.SQLite
                 blob = new SQLiteBlobHandle(handle, ptrBlob);
             }
 
-            SQLiteConnection.OnChanged(connection, new ConnectionEventArgs(
-                SQLiteConnectionEventType.NewCriticalHandle, null, null,
-                null, null, blob, null, new object[] { typeof(SQLiteBlob),
-                databaseName, tableName, columnName, rowId, readOnly }));
+            if (SQLiteConnection.CanOnChanged(connection, false))
+            {
+                SQLiteConnection.OnChanged(connection, new ConnectionEventArgs(
+                    SQLiteConnectionEventType.NewCriticalHandle, null, null,
+                    null, null, blob, null, new object[] { typeof(SQLiteBlob),
+                    databaseName, tableName, columnName, rowId, readOnly }));
+            }
 
             return new SQLiteBlob(sqlite3, blob);
         }

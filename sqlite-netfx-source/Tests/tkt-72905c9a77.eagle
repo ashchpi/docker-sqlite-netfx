@@ -38,6 +38,12 @@ if {[haveSQLiteObjectCommand]} then {
   set id [clock seconds]
 }
 
+set dateTime [appendArgs \
+    "\\\[\\d\{4\}-\\d\{2\}-\\d\{2\} " \
+    "\\d\{2\}:\\d\{2\}:\\d\{2\}\\.\\d\{1,7\}\\\]"]
+
+set cpus [expr {min(4 * [info processors], 16)}]
+
 ###############################################################################
 
 #
@@ -128,7 +134,7 @@ runTest {test tkt-72905c9a77-1.1 {StaticIsInitialized race condition} -setup {
               //       machine with 4 processors, limit the total number of
               //       threads to 16.
               //
-              int count = Math.Min(4 * Environment.ProcessorCount, 16);
+              int count = ${cpus};
 
               //
               // NOTE: Create a (reusable) delegate that will contain the code
@@ -286,12 +292,20 @@ buildConfiguration.Release !defineConstant.System.Data.SQLite.INTEROP_LOG\
 command.sql compile.DATA SQLite System.Data.SQLite compileCSharp}] -match \
 regexp -result [appendArgs \
 "^Ok System#CodeDom#Compiler#CompilerResults#\\d+ \\{\\} 0 \\{" \
-[string repeat "SQLite message \\(0\\): TEST $id\\n" \
-[expr {min(4 * [info processors], 16)}]] "\\}\$"]}
+"(?:" $dateTime " System\\.Data\\.SQLite \\(Verify\\): " \
+"SQLiteExtra\\.Configure \\(NoIsolated\\) Override: Harpy\\n)?" \
+"(?:" $dateTime " System\\.Data\\.SQLite \\(Verify\\): " \
+"SQLiteExtra\\.Configure \\(NoIsolated\\) Override: Badge\\n)?" \
+"(?:" $dateTime " System\\.Data\\.SQLite \\(Verify\\): " \
+"SQLiteExtra\\.Configure \\(Certificate\\) Override: Harpy\\n)?" \
+"(?:" $dateTime " System\\.Data\\.SQLite \\(Verify\\): " \
+"SQLiteExtra\\.Configure \\(Certificate\\) Override: Badge\\n)?" [string \
+repeat [appendArgs $dateTime " " "System\\.Data\\.SQLite \\(Log\\): " \
+"SQLite message \\(0\\): TEST " $id "\\n"] $cpus] "\\}\$"]}
 
 ###############################################################################
 
-unset -nocomplain id
+unset -nocomplain id dateTime cpus
 
 ###############################################################################
 

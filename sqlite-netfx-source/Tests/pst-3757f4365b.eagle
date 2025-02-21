@@ -1,0 +1,108 @@
+###############################################################################
+#
+# pst-3757f4365b.eagle --
+#
+# Written by Joe Mistachkin.
+# Released to the public domain, use at your own risk!
+#
+###############################################################################
+
+package require Eagle
+package require Eagle.Library
+package require Eagle.Test
+
+runTestPrologue
+
+###############################################################################
+
+package require System.Data.SQLite.Test
+runSQLiteTestPrologue
+
+###############################################################################
+
+runTest {test pst-3757f4365b-1.1 {support NuGet runtime identifiers} -setup {
+  set sourceFileName [object invoke -flags +NonPublic \
+      System.Data.SQLite.UnsafeNativeMethods GetNativeModuleFileName]
+
+  if {[string length $sourceFileName] > 0 && \
+      [file exists $sourceFileName]} then {
+    set fileNameOnly [file tail $sourceFileName]
+
+    if {[string length $fileNameOnly] > 0} then {
+      set temporaryDirectory [file join \
+          [getTemporaryDirectory] pst-3757f4365b-1.1]
+
+      set targetDirectory [file join \
+          $temporaryDirectory runtimes win-x86 native]
+
+      set targetFileName [file join \
+          $targetDirectory $fileNameOnly]
+
+      if {![file exists $targetDirectory]} then {
+        file mkdir $targetDirectory
+      }
+
+      if {![file exists $targetFileName]} then {
+        file copy $sourceFileName $targetFileName
+      }
+    } else {
+      error "missing source file name only"
+    }
+  } else {
+    error "missing source full file name"
+  }
+
+  saveEnvironmentVariables [list \
+      PreLoadSQLite_BaseDirectory \
+      PreLoadSQLite_ProcessorArchitecture] savedEnv
+
+  set env(PreLoadSQLite_BaseDirectory) $temporaryDirectory
+  set env(PreLoadSQLite_ProcessorArchitecture) x86
+} -body {
+  set baseDirectory null
+  set processorArchitecture null
+  set allowBaseDirectoryOnly false
+
+  object invoke -flags +NonPublic \
+      System.Data.SQLite.UnsafeNativeMethods SearchForDirectory \
+      baseDirectory processorArchitecture allowBaseDirectoryOnly
+
+  set nativeModuleFileName null
+  set nativeModuleHandle null
+
+  object invoke -flags +NonPublic \
+      System.Data.SQLite.UnsafeNativeMethods PreLoadSQLiteDll \
+      $baseDirectory $processorArchitecture $allowBaseDirectoryOnly \
+      true nativeModuleFileName nativeModuleHandle
+
+  list [expr {[string length $baseDirectory] > 0}] [string map \
+      [list \\ /] $processorArchitecture] $allowBaseDirectoryOnly \
+      [expr {[file normalize $nativeModuleFileName] eq [file \
+      normalize $targetFileName]}]
+} -cleanup {
+  restoreEnvironmentVariables [list \
+      PreLoadSQLite_BaseDirectory \
+      PreLoadSQLite_ProcessorArchitecture] savedEnv
+
+  catch {file delete $targetFileName}
+  catch {file rmdir $targetDirectory}
+
+  catch {
+    file rmdir [file join $temporaryDirectory runtimes win-x86]
+  }
+
+  catch {file rmdir [file join $temporaryDirectory runtimes]}
+  catch {file rmdir $temporaryDirectory}
+
+  unset -nocomplain nativeModuleFileName nativeModuleHandle
+  unset -nocomplain temporaryDirectory targetDirectory
+  unset -nocomplain fileNameOnly sourceFileName targetFileName
+  unset -nocomplain baseDirectory processorArchitecture allowBaseDirectoryOnly
+} -constraints {eagle command.object monoBug28 command.sql compile.DATA SQLite\
+System.Data.SQLite} -constraintExpression {![hasRuntimeOption native]} -result \
+{True runtimes/win-x86/native False True}}
+
+###############################################################################
+
+runSQLiteTestEpilogue
+runTestEpilogue

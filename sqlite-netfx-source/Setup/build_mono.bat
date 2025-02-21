@@ -137,12 +137,8 @@ REM TODO: This list of properties must be kept synchronized with the debug
 REM       list in the "SQLite.NET.Mono.Settings.targets" file.
 REM
 SET MSBUILD_ARGS_DEBUG=/property:CheckState=true
-SET MSBUILD_ARGS_DEBUG=%MSBUILD_ARGS_DEBUG% /property:CountHandle=true
-SET MSBUILD_ARGS_DEBUG=%MSBUILD_ARGS_DEBUG% /property:TraceConnection=true
-SET MSBUILD_ARGS_DEBUG=%MSBUILD_ARGS_DEBUG% /property:TraceDetection=true
 SET MSBUILD_ARGS_DEBUG=%MSBUILD_ARGS_DEBUG% /property:TraceHandle=true
 SET MSBUILD_ARGS_DEBUG=%MSBUILD_ARGS_DEBUG% /property:TraceStatement=true
-SET MSBUILD_ARGS_DEBUG=%MSBUILD_ARGS_DEBUG% /property:TrackMemoryBytes=true
 
 %_CECHO3% CALL "%TOOLS%\build_all.bat"
 %__ECHO3% CALL "%TOOLS%\build_all.bat"

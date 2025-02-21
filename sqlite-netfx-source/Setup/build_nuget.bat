@@ -104,6 +104,7 @@ IF ERRORLEVEL 1 (
 %_VECHO% NuGetVersion = '%NUGET_VERSION%'
 
 IF NOT EXIST "%ROOT%\Setup\Output" (
+  %_CECHO% MKDIR "%ROOT%\Setup\Output"
   %__ECHO% MKDIR "%ROOT%\Setup\Output"
 
   IF ERRORLEVEL 1 (
@@ -157,6 +158,7 @@ IF NOT DEFINED NO_NUGET_XPLATFORM (
 )
 
 IF NOT DEFINED NUGET_LEGACY_ONLY (
+  %_CECHO% "%NUGET%" pack -VerbatimVersion "%ROOT%\NuGet\SQLite.nuspec"
   %__ECHO% "%NUGET%" pack -VerbatimVersion "%ROOT%\NuGet\SQLite.nuspec"
 
   IF ERRORLEVEL 1 (
@@ -164,6 +166,7 @@ IF NOT DEFINED NUGET_LEGACY_ONLY (
     GOTO errors
   )
 
+  %_CECHO% "%NUGET%" pack -VerbatimVersion "%ROOT%\NuGet\SQLite.Core.nuspec"
   %__ECHO% "%NUGET%" pack -VerbatimVersion "%ROOT%\NuGet\SQLite.Core.nuspec"
 
   IF ERRORLEVEL 1 (
@@ -171,6 +174,7 @@ IF NOT DEFINED NUGET_LEGACY_ONLY (
     GOTO errors
   )
 
+  %_CECHO% "%NUGET%" pack -VerbatimVersion "%ROOT%\NuGet\SQLite.Core.NetFramework.nuspec"
   %__ECHO% "%NUGET%" pack -VerbatimVersion "%ROOT%\NuGet\SQLite.Core.NetFramework.nuspec"
 
   IF ERRORLEVEL 1 (
@@ -178,6 +182,7 @@ IF NOT DEFINED NUGET_LEGACY_ONLY (
     GOTO errors
   )
 
+  %_CECHO% "%NUGET%" pack -VerbatimVersion "%ROOT%\NuGet\SQLite.Core.NetStandard.nuspec"
   %__ECHO% "%NUGET%" pack -VerbatimVersion "%ROOT%\NuGet\SQLite.Core.NetStandard.nuspec"
 
   IF ERRORLEVEL 1 (
@@ -186,6 +191,7 @@ IF NOT DEFINED NUGET_LEGACY_ONLY (
   )
 
   IF NOT DEFINED NUGET_CORE_ONLY (
+    %_CECHO% "%NUGET%" pack -VerbatimVersion "%ROOT%\NuGet\SQLite.Core.MSIL.nuspec"
     %__ECHO% "%NUGET%" pack -VerbatimVersion "%ROOT%\NuGet\SQLite.Core.MSIL.nuspec"
 
     IF ERRORLEVEL 1 (
@@ -194,6 +200,7 @@ IF NOT DEFINED NUGET_LEGACY_ONLY (
     )
   )
 
+  %_CECHO% "%NUGET%" pack -VerbatimVersion "%ROOT%\NuGet\SQLite.EF6.nuspec"
   %__ECHO% "%NUGET%" pack -VerbatimVersion "%ROOT%\NuGet\SQLite.EF6.nuspec"
 
   IF ERRORLEVEL 1 (
@@ -201,6 +208,7 @@ IF NOT DEFINED NUGET_LEGACY_ONLY (
     GOTO errors
   )
 
+  %_CECHO% "%NUGET%" pack -VerbatimVersion "%ROOT%\NuGet\SQLite.Linq.nuspec"
   %__ECHO% "%NUGET%" pack -VerbatimVersion "%ROOT%\NuGet\SQLite.Linq.nuspec"
 
   IF ERRORLEVEL 1 (
@@ -211,6 +219,7 @@ IF NOT DEFINED NUGET_LEGACY_ONLY (
 
 IF NOT DEFINED NUGET_CORE_ONLY (
   IF NOT DEFINED NUGET_LEGACY_ONLY (
+    %_CECHO% "%NUGET%" pack -VerbatimVersion "%ROOT%\NuGet\SQLite.MSIL.nuspec"
     %__ECHO% "%NUGET%" pack -VerbatimVersion "%ROOT%\NuGet\SQLite.MSIL.nuspec"
 
     IF ERRORLEVEL 1 (
@@ -220,6 +229,7 @@ IF NOT DEFINED NUGET_CORE_ONLY (
   )
 
   IF NOT DEFINED NO_NUGET_LEGACY (
+    %_CECHO% "%NUGET%" pack -VerbatimVersion "%ROOT%\NuGet\SQLite.x86.nuspec"
     %__ECHO% "%NUGET%" pack -VerbatimVersion "%ROOT%\NuGet\SQLite.x86.nuspec"
 
     IF ERRORLEVEL 1 (
@@ -227,6 +237,7 @@ IF NOT DEFINED NUGET_CORE_ONLY (
       GOTO errors
     )
 
+    %_CECHO% "%NUGET%" pack -VerbatimVersion "%ROOT%\NuGet\SQLite.x64.nuspec"
     %__ECHO% "%NUGET%" pack -VerbatimVersion "%ROOT%\NuGet\SQLite.x64.nuspec"
 
     IF ERRORLEVEL 1 (
@@ -236,11 +247,14 @@ IF NOT DEFINED NUGET_CORE_ONLY (
   )
 )
 
-%__ECHO% MOVE *.nupkg "%ROOT%\Setup\Output"
+IF EXIST *.nupkg (
+  %_CECHO% MOVE *.nupkg "%ROOT%\Setup\Output"
+  %__ECHO% MOVE *.nupkg "%ROOT%\Setup\Output"
 
-IF ERRORLEVEL 1 (
-  ECHO Could not move "*.nupkg" to "%ROOT%\Setup\Output".
-  GOTO errors
+  IF ERRORLEVEL 1 (
+    ECHO Could not move "*.nupkg" to "%ROOT%\Setup\Output".
+    GOTO errors
+  )
 )
 
 GOTO no_errors

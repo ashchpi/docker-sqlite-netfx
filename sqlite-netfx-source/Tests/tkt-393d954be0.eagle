@@ -37,6 +37,7 @@ runTest {test tkt-393d954be0-1.1 {custom connection pool} -setup {
       $fileName]]]
 
   set counts null; set openCount 0; set closeCount 0; set totalCount 0
+
   object invoke -flags +NonPublic System.Data.SQLite.SQLiteConnectionPool \
       GetCounts $fileName counts openCount closeCount totalCount
 

@@ -35,11 +35,7 @@
               list in the "build_net_standard_20.bat" file.
     -->
     <CheckState Condition="'$(CheckState)' == ''">true</CheckState>
-    <CountHandle Condition="'$(CountHandle)' == ''">true</CountHandle>
-    <TraceConnection Condition="'$(TraceConnection)' == ''">true</TraceConnection>
-    <TraceDetection Condition="'$(TraceDetection)' == ''">true</TraceDetection>
     <TraceHandle Condition="'$(TraceHandle)' == ''">true</TraceHandle>
     <TraceStatement Condition="'$(TraceStatement)' == ''">true</TraceStatement>
-    <TrackMemoryBytes Condition="'$(TrackMemoryBytes)' == ''">true</TrackMemoryBytes>
   </PropertyGroup>
 </Project>

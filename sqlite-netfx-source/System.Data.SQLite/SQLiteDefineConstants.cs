@@ -28,6 +28,10 @@ namespace System.Data.SQLite
             "INTEROP_CODEC",
 #endif
 
+#if INTEROP_COMPRESS_EXTENSION
+            "INTEROP_COMPRESS_EXTENSION",
+#endif
+
 #if INTEROP_DEBUG
             "INTEROP_DEBUG",
 #endif
@@ -98,6 +102,10 @@ namespace System.Data.SQLite
 
 #if INTEROP_VIRTUAL_TABLE
             "INTEROP_VIRTUAL_TABLE",
+#endif
+
+#if INTEROP_ZIPFILE_EXTENSION
+            "INTEROP_ZIPFILE_EXTENSION",
 #endif
 
 #if NET_20

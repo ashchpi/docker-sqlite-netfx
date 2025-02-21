@@ -9,14 +9,10 @@ namespace System.Data.SQLite
 {
   using System;
   using System.Globalization;
-
-#if TRACE_DETECTION || TRACE_SHARED || TRACE_PRELOAD || TRACE_HANDLE
-  using System.Diagnostics;
-#endif
-
   using System.Collections.Generic;
   using System.IO;
   using System.Reflection;
+  using System.Text;
 
 #if !PLATFORM_COMPACTFRAMEWORK
   using System.Security;
@@ -27,8 +23,6 @@ namespace System.Data.SQLite
 #if (NET_40 || NET_45 || NET_451 || NET_452 || NET_46 || NET_461 || NET_462 || NET_47 || NET_471 || NET_472 || NET_48 || NET_STANDARD_20 || NET_STANDARD_21) && !PLATFORM_COMPACTFRAMEWORK
   using System.Runtime.Versioning;
 #endif
-
-  using System.Text;
 
 #if !PLATFORM_COMPACTFRAMEWORK || COUNT_HANDLE
   using System.Threading;
@@ -327,287 +321,9 @@ namespace System.Data.SQLite
   /// This static class provides some methods that are shared between the
   /// native library pre-loader and other classes.
   /// </summary>
-  internal static class HelperMethods
+  internal static partial class HelperMethods
   {
-      #region Private Constants
-      private const string DisplayNullObject = "<nullObject>";
-      private const string DisplayEmptyString = "<emptyString>";
-      private const string DisplayStringFormat = "\"{0}\"";
-
-      /////////////////////////////////////////////////////////////////////////
-
-      private const string DisplayNullArray = "<nullArray>";
-      private const string DisplayEmptyArray = "<emptyArray>";
-
-      /////////////////////////////////////////////////////////////////////////
-
-      private const char ArrayOpen = '[';
-      private const string ElementSeparator = ", ";
-      private const char ArrayClose = ']';
-
-      /////////////////////////////////////////////////////////////////////////
-
-      private static readonly char[] SpaceChars = {
-          '\t', '\n', '\r', '\v', '\f', ' '
-      };
-      #endregion
-
-      /////////////////////////////////////////////////////////////////////////
-
-      #region Private Data
-      /// <summary>
-      /// This lock is used to protect the static <see cref="isMono" /> and
-      /// <see cref="isDotNetCore" /> fields.
-      /// </summary>
-      private static readonly object staticSyncRoot = new object();
-
-      /////////////////////////////////////////////////////////////////////////
-      /// <summary>
-      /// This type is only present when running on Mono.
-      /// </summary>
-      private static readonly string MonoRuntimeType = "Mono.Runtime";
-
-      /////////////////////////////////////////////////////////////////////////
-      /// <summary>
-      /// This type is only present when running on .NET Core.
-      /// </summary>
-      private static readonly string DotNetCoreLibType = "System.CoreLib";
-
-      /////////////////////////////////////////////////////////////////////////
-      /// <summary>
-      /// Keeps track of whether we are running on Mono.  Initially null, it is
-      /// set by the <see cref="IsMono" /> method on its first call.  Later, it
-      /// is returned verbatim by the <see cref="IsMono" /> method.
-      /// </summary>
-      private static bool? isMono = null;
-
-      /////////////////////////////////////////////////////////////////////////
-      /// <summary>
-      /// Keeps track of whether we are running on .NET Core.  Initially null,
-      /// it is set by the <see cref="IsDotNetCore" /> method on its first
-      /// call.  Later, it is returned verbatim by the
-      /// <see cref="IsDotNetCore" /> method.
-      /// </summary>
-      private static bool? isDotNetCore = null;
-
-      /////////////////////////////////////////////////////////////////////////
-      /// <summary>
-      /// Keeps track of whether we successfully invoked the
-      /// <see cref="Debugger.Break" /> method.  Initially null, it is set by
-      /// the <see cref="MaybeBreakIntoDebugger" /> method on its first call.
-      /// </summary>
-      private static bool? debuggerBreak = null;
-      #endregion
-
-      /////////////////////////////////////////////////////////////////////////
-
-      #region Private Methods
-      /// <summary>
-      /// Determines the ID of the current process.  Only used for debugging.
-      /// </summary>
-      /// <returns>
-      /// The ID of the current process -OR- zero if it cannot be determined.
-      /// </returns>
-      private static int GetProcessId()
-      {
-          Process process = Process.GetCurrentProcess();
-
-          if (process == null)
-              return 0;
-
-          return process.Id;
-      }
-
-      ///////////////////////////////////////////////////////////////////////
-
-      /// <summary>
-      /// Determines whether or not this assembly is running on Mono.
-      /// </summary>
-      /// <returns>
-      /// Non-zero if this assembly is running on Mono.
-      /// </returns>
-      private static bool IsMono()
-      {
-          try
-          {
-              lock (staticSyncRoot)
-              {
-                  if (isMono == null)
-                      isMono = (Type.GetType(MonoRuntimeType) != null);
-
-                  return (bool)isMono;
-              }
-          }
-          catch
-          {
-              // do nothing.
-          }
-
-          return false;
-      }
-
-      ///////////////////////////////////////////////////////////////////////
-
-      /// <summary>
-      /// Determines whether or not this assembly is running on .NET Core.
-      /// </summary>
-      /// <returns>
-      /// Non-zero if this assembly is running on .NET Core.
-      /// </returns>
-      public static bool IsDotNetCore()
-      {
-          try
-          {
-              lock (staticSyncRoot)
-              {
-                  if (isDotNetCore == null)
-                  {
-                      isDotNetCore = (Type.GetType(
-                          DotNetCoreLibType) != null);
-                  }
-
-                  return (bool)isDotNetCore;
-              }
-          }
-          catch
-          {
-              // do nothing.
-          }
-
-          return false;
-      }
-      #endregion
-
-      /////////////////////////////////////////////////////////////////////////
-
       #region Internal Methods
-      /// <summary>
-      /// Resets the cached value for the "PreLoadSQLite_BreakIntoDebugger"
-      /// configuration setting.
-      /// </summary>
-      internal static void ResetBreakIntoDebugger()
-      {
-          lock (staticSyncRoot)
-          {
-              debuggerBreak = null;
-          }
-      }
-
-      /////////////////////////////////////////////////////////////////////////
-
-      /// <summary>
-      /// If the "PreLoadSQLite_BreakIntoDebugger" configuration setting is
-      /// present (e.g. via the environment), give the interactive user an
-      /// opportunity to attach a debugger to the current process; otherwise,
-      /// do nothing.
-      /// </summary>
-      internal static void MaybeBreakIntoDebugger()
-      {
-          lock (staticSyncRoot)
-          {
-              if (debuggerBreak != null)
-                  return;
-          }
-
-          if (UnsafeNativeMethods.GetSettingValue(
-                "PreLoadSQLite_BreakIntoDebugger", null) != null)
-          {
-              //
-              // NOTE: Attempt to use the Console in order to prompt the
-              //       interactive user (if any).  This may fail for any
-              //       number of reasons.  Even in those cases, we still
-              //       want to issue the actual request to break into the
-              //       debugger.
-              //
-              try
-              {
-                  Console.WriteLine(StringFormat(
-                      CultureInfo.CurrentCulture,
-                      "Attach a debugger to process {0} " +
-                      "and press any key to continue.",
-                      GetProcessId()));
-
-#if PLATFORM_COMPACTFRAMEWORK
-                  Console.ReadLine();
-#else
-                  Console.ReadKey();
-#endif
-              }
-#if !NET_COMPACT_20 && TRACE_SHARED
-              catch (Exception e)
-#else
-              catch (Exception)
-#endif
-              {
-#if !NET_COMPACT_20 && TRACE_SHARED
-                  try
-                  {
-                      Trace.WriteLine(HelperMethods.StringFormat(
-                          CultureInfo.CurrentCulture,
-                          "Failed to issue debugger prompt, " +
-                          "{0} may be unusable: {1}",
-                          typeof(Console), e)); /* throw */
-                  }
-                  catch
-                  {
-                      // do nothing.
-                  }
-#endif
-              }
-
-              try
-              {
-                  Debugger.Break();
-
-                  lock (staticSyncRoot)
-                  {
-                      debuggerBreak = true;
-                  }
-              }
-              catch
-              {
-                  lock (staticSyncRoot)
-                  {
-                      debuggerBreak = false;
-                  }
-
-                  throw;
-              }
-          }
-          else
-          {
-              //
-              // BUGFIX: There is (almost) no point in checking for the
-              //         associated configuration setting repeatedly.
-              //         Prevent that here by setting the cached value
-              //         to false.
-              //
-              lock (staticSyncRoot)
-              {
-                  debuggerBreak = false;
-              }
-          }
-      }
-
-      /////////////////////////////////////////////////////////////////////////
-
-      /// <summary>
-      /// Determines the ID of the current thread.  Only used for debugging.
-      /// </summary>
-      /// <returns>
-      /// The ID of the current thread -OR- zero if it cannot be determined.
-      /// </returns>
-      internal static int GetThreadId()
-      {
-#if !PLATFORM_COMPACTFRAMEWORK
-          return AppDomain.GetCurrentThreadId();
-#else
-          return 0;
-#endif
-      }
-
-      /////////////////////////////////////////////////////////////////////////
-
       /// <summary>
       /// Determines if the specified flags are present within the flags
       /// associated with the parent connection object.
@@ -631,7 +347,6 @@ namespace System.Data.SQLite
       }
 
       /////////////////////////////////////////////////////////////////////////
-
       /// <summary>
       /// Determines if preparing a query should be logged.
       /// </summary>
@@ -791,120 +506,6 @@ namespace System.Data.SQLite
           )
       {
           return HasFlags(flags, SQLiteConnectionFlags.LogRetry);
-      }
-
-      /////////////////////////////////////////////////////////////////////////
-      /// <summary>
-      /// Determines if the current process is running on one of the Windows
-      /// [sub-]platforms.
-      /// </summary>
-      /// <returns>
-      /// Non-zero when running on Windows; otherwise, zero.
-      /// </returns>
-      internal static bool IsWindows()
-      {
-          PlatformID platformId = Environment.OSVersion.Platform;
-
-          if ((platformId == PlatformID.Win32S) ||
-              (platformId == PlatformID.Win32Windows) ||
-              (platformId == PlatformID.Win32NT) ||
-              (platformId == PlatformID.WinCE))
-          {
-              return true;
-          }
-
-          return false;
-      }
-
-      /////////////////////////////////////////////////////////////////////////
-      /// <summary>
-      /// This is a wrapper around the
-      /// <see cref="String.Format(IFormatProvider,String,Object[])" /> method.
-      /// On Mono, it has to call the method overload without the
-      /// <see cref="IFormatProvider" /> parameter, due to a bug in Mono.
-      /// </summary>
-      /// <param name="provider">
-      /// This is used for culture-specific formatting.
-      /// </param>
-      /// <param name="format">
-      /// The format string.
-      /// </param>
-      /// <param name="args">
-      /// An array the objects to format.
-      /// </param>
-      /// <returns>
-      /// The resulting string.
-      /// </returns>
-      internal static string StringFormat(
-          IFormatProvider provider,
-          string format,
-          params object[] args
-          )
-      {
-          if (IsMono())
-              return String.Format(format, args);
-          else
-              return String.Format(provider, format, args);
-      }
-      #endregion
-
-      /////////////////////////////////////////////////////////////////////////
-
-      #region Public Methods
-      public static string ToDisplayString(
-          object value
-          )
-      {
-          if (value == null)
-              return DisplayNullObject;
-
-          string stringValue = value.ToString();
-
-          if (stringValue.Length == 0)
-              return DisplayEmptyString;
-
-          if (stringValue.IndexOfAny(SpaceChars) < 0)
-              return stringValue;
-
-          return HelperMethods.StringFormat(
-              CultureInfo.InvariantCulture, DisplayStringFormat,
-              stringValue);
-      }
-
-      /////////////////////////////////////////////////////////////////////////
-
-      public static string ToDisplayString(
-          Array array
-          )
-      {
-          if (array == null)
-              return DisplayNullArray;
-
-          if (array.Length == 0)
-              return DisplayEmptyArray;
-
-          StringBuilder result = new StringBuilder();
-
-          foreach (object value in array)
-          {
-              if (result.Length > 0)
-                  result.Append(ElementSeparator);
-
-              result.Append(ToDisplayString(value));
-          }
-
-          if (result.Length > 0)
-          {
-#if PLATFORM_COMPACTFRAMEWORK
-              result.Insert(0, ArrayOpen.ToString());
-#else
-              result.Insert(0, ArrayOpen);
-#endif
-
-              result.Append(ArrayClose);
-          }
-
-          return result.ToString();
       }
       #endregion
   }
@@ -1577,6 +1178,18 @@ namespace System.Data.SQLite
 
       /////////////////////////////////////////////////////////////////////////
       /// <summary>
+      /// This dictionary stores the mappings between processor architecture
+      /// names and runtime names.  These mappings are now used for two
+      /// purposes.  First, they are used to determine if the assembly code
+      /// base should be used instead of the location, based upon whether one
+      /// or more of the named sub-directories exist within the assembly code
+      /// base.  Second, they are used to assist in loading the appropriate
+      /// SQLite interop assembly into the current process.
+      /// </summary>
+      private static Dictionary<string, string> processorArchitectureRuntimes;
+
+      /////////////////////////////////////////////////////////////////////////
+      /// <summary>
       /// This is the cached return value from the
       /// <see cref="GetAssemblyDirectory" /> method -OR- null if that method
       /// has never returned a valid value.
@@ -1647,6 +1260,19 @@ namespace System.Data.SQLite
 
           /////////////////////////////////////////////////////////////////////
 
+          #region Setup Enabled Trace Categories
+          if (!HelperMethods.AreTraceCategoriesSet()) /* ONCE */
+          {
+              TraceCategory? categories = HelperMethods.ParseTraceCategories(
+                  GetSettingValue("SQLite_TraceCategories", null));
+
+              if (categories != null)
+                  HelperMethods.SetTraceCategories((TraceCategory)categories);
+          }
+          #endregion
+
+          /////////////////////////////////////////////////////////////////////
+
           #region Debug Build Only
 #if DEBUG
           //
@@ -1664,7 +1290,11 @@ namespace System.Data.SQLite
           // NOTE: Check if a debugger needs to be attached before doing any
           //       real work.
           //
-          HelperMethods.MaybeBreakIntoDebugger();
+          HelperMethods.MaybeBreakIntoDebugger(
+              UnsafeNativeMethods.GetSettingValue(
+                  "PreLoadSQLite_BreakIntoDebugger", null) != null);
+
+          /////////////////////////////////////////////////////////////////////
 
 #if SQLITE_STANDARD || USE_INTEROP_DLL || PLATFORM_COMPACTFRAMEWORK
 #if PRELOAD_NATIVE_LIBRARY
@@ -1767,6 +1397,42 @@ namespace System.Data.SQLite
 
               /////////////////////////////////////////////////////////////////
 
+              if (processorArchitectureRuntimes == null)
+              {
+                  //
+                  // NOTE: Create the map of processor architecture names
+                  //       to runtime names using a case-insensitive string
+                  //       comparer.
+                  //
+                  processorArchitectureRuntimes =
+                      new Dictionary<string, string>(
+                          StringComparer.OrdinalIgnoreCase);
+
+                  //
+                  // NOTE: Setup the list of runtime names associated with
+                  //       the supported processor architectures.
+                  //
+                  processorArchitectureRuntimes.Add(
+                      "x86", "runtimes.win-x86.native");
+
+                  processorArchitectureRuntimes.Add(
+                      "x86_64", "runtimes.win-x64.native");
+
+                  processorArchitectureRuntimes.Add(
+                      "AMD64", "runtimes.win-x64.native");
+
+                  processorArchitectureRuntimes.Add(
+                      "IA64", "runtimes.win-ia64.native");
+
+                  processorArchitectureRuntimes.Add(
+                      "ARM", "runtimes.win-arm.native");
+
+                  processorArchitectureRuntimes.Add(
+                      "ARM64", "runtimes.win-arm64.native");
+              }
+
+              /////////////////////////////////////////////////////////////////
+
 #if SQLITE_STANDARD || USE_INTEROP_DLL || PLATFORM_COMPACTFRAMEWORK
 #if PRELOAD_NATIVE_LIBRARY
               //
@@ -1789,8 +1455,9 @@ namespace System.Data.SQLite
                   //       and native module handle for later usage.
                   //
                   /* IGNORED */
-                  PreLoadSQLiteDll(baseDirectory,
-                      processorArchitecture, allowBaseDirectoryOnly,
+                  PreLoadSQLiteDll(
+                      baseDirectory, processorArchitecture,
+                      false, allowBaseDirectoryOnly,
                       ref _SQLiteNativeModuleFileName,
                       ref _SQLiteNativeModuleHandle);
               }
@@ -2015,11 +1682,11 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_SHARED
                           try
                           {
-                              Trace.WriteLine(HelperMethods.StringFormat(
+                              HelperMethods.Trace(HelperMethods.StringFormat(
                                   CultureInfo.CurrentCulture, "Native " +
                                   "library pre-loader failed to replace XML " +
                                   "configuration file \"{0}\" tokens: {1}",
-                                  fileName, e)); /* throw */
+                                  fileName, e), TraceCategory.Shared); /* throw */
                           }
                           catch
                           {
@@ -2121,11 +1788,11 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_SHARED
               try
               {
-                  Trace.WriteLine(HelperMethods.StringFormat(
+                  HelperMethods.Trace(HelperMethods.StringFormat(
                       CultureInfo.CurrentCulture, "Native library " +
                       "pre-loader failed to get setting \"{0}\" value " +
                       "from XML configuration file \"{1}\": {2}", name,
-                      fileName, e)); /* throw */
+                      fileName, e), TraceCategory.Shared); /* throw */
               }
               catch
               {
@@ -2292,10 +1959,11 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_SHARED
                           try
                           {
-                              Trace.WriteLine(HelperMethods.StringFormat(
+                              HelperMethods.Trace(HelperMethods.StringFormat(
                                   CultureInfo.CurrentCulture, "Native library " +
                                   "pre-loader failed to replace assembly " +
-                                  "directory token: {0}", e)); /* throw */
+                                  "directory token: {0}", e),
+                                  TraceCategory.Shared); /* throw */
                           }
                           catch
                           {
@@ -2323,10 +1991,11 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_SHARED
                       try
                       {
-                          Trace.WriteLine(HelperMethods.StringFormat(
+                          HelperMethods.Trace(HelperMethods.StringFormat(
                               CultureInfo.CurrentCulture, "Native library " +
                               "pre-loader failed to obtain executing " +
-                              "assembly: {0}", e)); /* throw */
+                              "assembly: {0}", e),
+                              TraceCategory.Shared); /* throw */
                       }
                       catch
                       {
@@ -2354,10 +2023,11 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_SHARED
                           try
                           {
-                              Trace.WriteLine(HelperMethods.StringFormat(
+                              HelperMethods.Trace(HelperMethods.StringFormat(
                                   CultureInfo.CurrentCulture, "Native library " +
                                   "pre-loader failed to replace target " +
-                                  "framework token: {0}", e)); /* throw */
+                                  "framework token: {0}", e),
+                                  TraceCategory.Shared); /* throw */
                           }
                           catch
                           {
@@ -2552,7 +2222,8 @@ namespace System.Data.SQLite
                   foreach (KeyValuePair<string, string> pair
                             in processorArchitecturePlatforms)
                   {
-                      if (Directory.Exists(MaybeCombinePath(directory, pair.Key)))
+                      if (Directory.Exists(
+                            MaybeCombinePath(directory, pair.Key)))
                       {
                           matches.Add(pair.Key);
                           result++;
@@ -2563,7 +2234,53 @@ namespace System.Data.SQLite
                       if (value == null)
                           continue;
 
-                      if (Directory.Exists(MaybeCombinePath(directory, value)))
+                      if (Directory.Exists(
+                            MaybeCombinePath(directory, value)))
+                      {
+                          matches.Add(value);
+                          result++;
+                      }
+                  }
+              }
+          }
+
+          return result;
+      }
+
+      /////////////////////////////////////////////////////////////////////////
+
+      private static int CheckForArchitecturesAndRuntimes(
+          string directory,
+          ref List<string> matches
+          )
+      {
+          int result = 0;
+
+          if (matches == null)
+              matches = new List<string>();
+
+          lock (staticSyncRoot)
+          {
+              if (!String.IsNullOrEmpty(directory) &&
+                  (processorArchitectureRuntimes != null))
+              {
+                  foreach (KeyValuePair<string, string> pair
+                            in processorArchitectureRuntimes)
+                  {
+                      if (Directory.Exists(
+                            MaybeCombinePath(directory, pair.Key)))
+                      {
+                          matches.Add(pair.Key);
+                          result++;
+                      }
+
+                      string value = pair.Value;
+
+                      if (value == null)
+                          continue;
+
+                      if (Directory.Exists(
+                            MaybeCombinePath(directory, value)))
                       {
                           matches.Add(value);
                           result++;
@@ -2609,12 +2326,13 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_DETECTION
                   try
                   {
-                      Trace.WriteLine(HelperMethods.StringFormat(
+                      HelperMethods.Trace(HelperMethods.StringFormat(
                           CultureInfo.CurrentCulture,
                           "Native library pre-loader found primary XML " +
                           "configuration file via code base for currently " +
                           "executing assembly: \"{0}\"",
-                          xmlConfigFileName)); /* throw */
+                          xmlConfigFileName),
+                          TraceCategory.Detection); /* throw */
                   }
                   catch
                   {
@@ -2634,12 +2352,13 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_DETECTION
                   try
                   {
-                      Trace.WriteLine(HelperMethods.StringFormat(
+                      HelperMethods.Trace(HelperMethods.StringFormat(
                           CultureInfo.CurrentCulture,
                           "Native library pre-loader found secondary XML " +
                           "configuration file via code base for currently " +
                           "executing assembly: \"{0}\"",
-                          xmlAltConfigFileName)); /* throw */
+                          xmlAltConfigFileName),
+                          TraceCategory.Detection); /* throw */
                   }
                   catch
                   {
@@ -2658,11 +2377,36 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_DETECTION
                   try
                   {
-                      Trace.WriteLine(HelperMethods.StringFormat(
+                      HelperMethods.Trace(HelperMethods.StringFormat(
                           CultureInfo.CurrentCulture,
-                          "Native library pre-loader found native sub-directories " +
-                          "via code base for currently executing assembly: \"{0}\"",
-                          ListToString(matches))); /* throw */
+                          "Native library pre-loader found native platform " +
+                          "sub-directories via code base for currently " +
+                          "executing assembly: \"{0}\"",
+                          ListToString(matches)),
+                          TraceCategory.Detection); /* throw */
+                  }
+                  catch
+                  {
+                      // do nothing.
+                  }
+#endif
+
+                  fileName = localFileName;
+                  return true;
+              }
+
+              if (CheckForArchitecturesAndRuntimes(directory, ref matches) > 0)
+              {
+#if !NET_COMPACT_20 && TRACE_DETECTION
+                  try
+                  {
+                      HelperMethods.Trace(HelperMethods.StringFormat(
+                          CultureInfo.CurrentCulture,
+                          "Native library pre-loader found native runtime " +
+                          "sub-directories via code base for currently " +
+                          "executing assembly: \"{0}\"",
+                          ListToString(matches)),
+                          TraceCategory.Detection); /* throw */
                   }
                   catch
                   {
@@ -2685,10 +2429,11 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_SHARED
               try
               {
-                  Trace.WriteLine(HelperMethods.StringFormat(
+                  HelperMethods.Trace(HelperMethods.StringFormat(
                       CultureInfo.CurrentCulture,
                       "Native library pre-loader failed to check code base " +
-                      "for currently executing assembly: {0}", e)); /* throw */
+                      "for currently executing assembly: {0}", e),
+                      TraceCategory.Shared); /* throw */
               }
               catch
               {
@@ -2844,10 +2589,11 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_SHARED
               try
               {
-                  Trace.WriteLine(HelperMethods.StringFormat(
+                  HelperMethods.Trace(HelperMethods.StringFormat(
                       CultureInfo.CurrentCulture,
                       "Native library pre-loader failed to get directory " +
-                      "for currently executing assembly: {0}", e)); /* throw */
+                      "for currently executing assembly: {0}", e),
+                      TraceCategory.Shared); /* throw */
               }
               catch
               {
@@ -3005,6 +2751,7 @@ namespace System.Data.SQLite
           //       this process.
           //
           string[] directories = {
+              GetBaseDirectory(true),
               GetAssemblyDirectory(),
 #if !PLATFORM_COMPACTFRAMEWORK
               AppDomain.CurrentDomain.BaseDirectory,
@@ -3023,6 +2770,7 @@ namespace System.Data.SQLite
           string[] subDirectories = {
               GetProcessorArchitecture(), /* e.g. "x86" */
               GetPlatformName(null),      /* e.g. "Win32" */
+              GetRuntimeName(null, true), /* e.g. "runtimes\win-x86\native" */
               extraSubDirectory           /* base directory only? */
           };
 
@@ -3051,12 +2799,13 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_DETECTION
                       try
                       {
-                          Trace.WriteLine(HelperMethods.StringFormat(
+                          HelperMethods.Trace(HelperMethods.StringFormat(
                               CultureInfo.CurrentCulture,
                               "Native library pre-loader found native file " +
                               "name \"{0}\", returning directory \"{1}\" and " +
                               "sub-directory \"{2}\"...", fileName, directory,
-                              subDirectory)); /* throw */
+                              subDirectory),
+                              TraceCategory.Detection); /* throw */
                       }
                       catch
                       {
@@ -3081,11 +2830,17 @@ namespace System.Data.SQLite
       /// Queries and returns the base directory of the current application
       /// domain.
       /// </summary>
+      /// <param name="overrideOnly">
+      /// Non-zero if this method should only consider a base directory that
+      /// has been manually overridden by the application.
+      /// </param>
       /// <returns>
       /// The base directory for the current application domain -OR- null if it
       /// cannot be determined.
       /// </returns>
-      private static string GetBaseDirectory()
+      private static string GetBaseDirectory(
+          bool overrideOnly /* in */
+          )
       {
           //
           // NOTE: If the "PreLoadSQLite_BaseDirectory" environment variable
@@ -3096,6 +2851,9 @@ namespace System.Data.SQLite
 
           if (directory != null)
               return directory;
+
+          if (overrideOnly)
+              return null;
 
 #if !PLATFORM_COMPACTFRAMEWORK
           //
@@ -3225,13 +2983,14 @@ namespace System.Data.SQLite
                   // NOTE: Show that we hit a fairly unusual situation (i.e.
                   //       the "wrong" processor architecture was detected).
                   //
-                  Trace.WriteLine(HelperMethods.StringFormat(
+                  HelperMethods.Trace(HelperMethods.StringFormat(
                       CultureInfo.CurrentCulture,
                       "Native library pre-loader detected {0}-bit pointer " +
                       "size with processor architecture \"{1}\", using " +
                       "processor architecture \"{2}\" instead...",
                       IntPtr.Size * 8 /* bits */, savedProcessorArchitecture,
-                      processorArchitecture)); /* throw */
+                      processorArchitecture),
+                      TraceCategory.Detection); /* throw */
               }
               catch
               {
@@ -3305,6 +3064,63 @@ namespace System.Data.SQLite
 
       /////////////////////////////////////////////////////////////////////////
       /// <summary>
+      /// Given the processor architecture, returns the name of the runtime.
+      /// </summary>
+      /// <param name="processorArchitecture">
+      /// The processor architecture to be translated to a runtime name.
+      /// </param>
+      /// <returns>
+      /// <param name="forUseAsPath">
+      /// Non-zero if the component separators within the runtime name should
+      /// be replaced with directory separators.
+      /// </param>
+      /// The runtime name for the specified processor architecture -OR- null
+      /// if it cannot be determined.
+      /// </returns>
+      private static string GetRuntimeName(
+          string processorArchitecture, /* in */
+          bool forUseAsPath             /* in */
+          )
+      {
+          if (processorArchitecture == null)
+              processorArchitecture = GetProcessorArchitecture();
+
+          if (String.IsNullOrEmpty(processorArchitecture))
+              return null;
+
+          lock (staticSyncRoot)
+          {
+              if (processorArchitectureRuntimes == null)
+                  return null;
+
+              string runtimeName;
+
+              if (processorArchitectureRuntimes.TryGetValue(
+                      processorArchitecture, out runtimeName))
+              {
+                  if (forUseAsPath && (runtimeName != null))
+                  {
+                      char oldSeparator = '.'; // REF: Initialize()
+
+                      char newSeparator = HelperMethods.IsWindows() ?
+                          Path.DirectorySeparatorChar :
+                          Path.AltDirectorySeparatorChar;
+
+                      return runtimeName.Replace(
+                          oldSeparator, newSeparator);
+                  }
+                  else
+                  {
+                      return runtimeName;
+                  }
+              }
+          }
+
+          return null;
+      }
+
+      /////////////////////////////////////////////////////////////////////////
+      /// <summary>
       /// Attempts to load the native SQLite library based on the specified
       /// directory and processor architecture.
       /// </summary>
@@ -3321,6 +3137,10 @@ namespace System.Data.SQLite
       /// <param name="allowBaseDirectoryOnly">
       /// Non-zero indicates that the native SQLite library can be loaded
       /// from the base directory itself.
+      /// </param>
+      /// <param name="whatIf">
+      /// Non-zero to skip loading of the native SQLite library, i.e. only
+      /// set the native module file name.
       /// </param>
       /// <param name="nativeModuleFileName">
       /// The candidate native module file name to load will be stored here,
@@ -3339,6 +3159,7 @@ namespace System.Data.SQLite
           string baseDirectory,            /* in */
           string processorArchitecture,    /* in */
           bool allowBaseDirectoryOnly,     /* in */
+          bool whatIf,                     /* in */
           ref string nativeModuleFileName, /* out */
           ref IntPtr nativeModuleHandle    /* out */
           )
@@ -3348,7 +3169,7 @@ namespace System.Data.SQLite
           //       (i.e. attempt to automatically detect it).
           //
           if (baseDirectory == null)
-              baseDirectory = GetBaseDirectory();
+              baseDirectory = GetBaseDirectory(false);
 
           //
           // NOTE: If we failed to query the base directory, stop now.
@@ -3383,7 +3204,7 @@ namespace System.Data.SQLite
               if (allowBaseDirectoryOnly &&
                   String.IsNullOrEmpty(processorArchitecture))
               {
-                  goto baseDirOnly;
+                  goto tryLoad;
               }
               else
               {
@@ -3423,27 +3244,47 @@ namespace System.Data.SQLite
               //
               string platformName = GetPlatformName(processorArchitecture);
 
-              //
-              // NOTE: If we failed to translate the platform name, stop now.
-              //
-              if (platformName == null)
-                  return false;
+              if (platformName != null)
+              {
+                  //
+                  // NOTE: Build the full path and file name for the native
+                  //       SQLite library using the platform name.
+                  //
+                  fileName = FixUpDllFileName(MaybeCombinePath(
+                      MaybeCombinePath(baseDirectory, platformName),
+                      fileNameOnly));
+
+                  if (File.Exists(fileName))
+                      goto tryLoad;
+              }
 
               //
-              // NOTE: Build the full path and file name for the native SQLite
-              //       library using the platform name.
+              // NOTE: Attempt to translate the processor architecture to a
+              //       runtime name.
               //
-              fileName = FixUpDllFileName(MaybeCombinePath(MaybeCombinePath(
-                  baseDirectory, platformName), fileNameOnly));
+              string runtimeName = GetRuntimeName(processorArchitecture, true);
+
+              if (runtimeName != null)
+              {
+                  //
+                  // NOTE: Build the full path and file name for the native
+                  //       SQLite library using the runtime name.
+                  //
+                  fileName = FixUpDllFileName(MaybeCombinePath(
+                      MaybeCombinePath(baseDirectory, runtimeName),
+                      fileNameOnly));
+
+                  if (File.Exists(fileName))
+                      goto tryLoad;
+              }
 
               //
-              // NOTE: If the file does not exist, skip trying to load it.
+              // NOTE: If no candidate files exist, skip trying to load...
               //
-              if (!File.Exists(fileName))
-                  return false;
+              return false;
           }
 
-      baseDirOnly:
+      tryLoad:
 
           try
           {
@@ -3454,10 +3295,11 @@ namespace System.Data.SQLite
                   // NOTE: Show exactly where we are trying to load the native
                   //       SQLite library from.
                   //
-                  Trace.WriteLine(HelperMethods.StringFormat(
+                  HelperMethods.Trace(HelperMethods.StringFormat(
                       CultureInfo.CurrentCulture,
                       "Native library pre-loader is trying to load native " +
-                      "SQLite library \"{0}\"...", fileName)); /* throw */
+                      "SQLite library \"{0}\"...", fileName),
+                      TraceCategory.Preload); /* throw */
               }
               catch
               {
@@ -3472,7 +3314,12 @@ namespace System.Data.SQLite
               //       P/Invoke method for the current operating system.
               //
               nativeModuleFileName = fileName;
-              nativeModuleHandle = NativeLibraryHelper.LoadLibrary(fileName);
+
+              if (!whatIf)
+              {
+                  nativeModuleHandle = NativeLibraryHelper.LoadLibrary(
+                      fileName);
+              }
 
               return (nativeModuleHandle != IntPtr.Zero);
           }
@@ -3495,11 +3342,12 @@ namespace System.Data.SQLite
                   //       library from along with the Win32 error code and
                   //       exception information.
                   //
-                  Trace.WriteLine(HelperMethods.StringFormat(
+                  HelperMethods.Trace(HelperMethods.StringFormat(
                       CultureInfo.CurrentCulture,
                       "Native library pre-loader failed to load native " +
                       "SQLite library \"{0}\" (getLastError = {1}): {2}",
-                      fileName, lastError, e)); /* throw */
+                      fileName, lastError, e),
+                      TraceCategory.Preload); /* throw */
               }
               catch
               {
@@ -3524,7 +3372,7 @@ namespace System.Data.SQLite
     //       System.Data.SQLite functionality (e.g. being able to bind
     //       parameters and handle column values of types Int64 and Double).
     //
-    internal const string SQLITE_DLL = "SQLite.Interop.118.dll";
+    internal const string SQLITE_DLL = "SQLite.Interop.119.dll";
 #elif SQLITE_STANDARD
     //
     // NOTE: Otherwise, if the standard SQLite library is enabled, use it.
@@ -4810,6 +4658,20 @@ namespace System.Data.SQLite
     [DllImport(SQLITE_DLL)]
 #endif
     internal static extern SQLiteTransactionState sqlite3_txn_state(IntPtr db, IntPtr zSchema);
+
+#if !PLATFORM_COMPACTFRAMEWORK
+    [DllImport(SQLITE_DLL, CallingConvention = CallingConvention.Cdecl)]
+#else
+    [DllImport(SQLITE_DLL)]
+#endif
+    internal static extern IntPtr sqlite3_serialize(IntPtr db, IntPtr zSchema, ref long dataSize, SQLiteSerializeFlags flags);
+
+#if !PLATFORM_COMPACTFRAMEWORK
+    [DllImport(SQLITE_DLL, CallingConvention = CallingConvention.Cdecl)]
+#else
+    [DllImport(SQLITE_DLL)]
+#endif
+    internal static extern SQLiteErrorCode sqlite3_deserialize(IntPtr db, IntPtr zSchema, IntPtr pData, long dataSize, long bufferSize, SQLiteDeserializeFlags flags);
     #endregion
 
     ///////////////////////////////////////////////////////////////////////////
@@ -5762,9 +5624,10 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_HANDLE
                 try
                 {
-                    Trace.WriteLine(HelperMethods.StringFormat(
+                    HelperMethods.Trace(HelperMethods.StringFormat(
                         CultureInfo.CurrentCulture,
-                        "CloseConnection: {0}", localHandle)); /* throw */
+                        "CloseConnection: {0}", localHandle),
+                        TraceCategory.Handle); /* throw */
                 }
                 catch
                 {
@@ -5796,10 +5659,10 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_HANDLE
                 try
                 {
-                    Trace.WriteLine(HelperMethods.StringFormat(
+                    HelperMethods.Trace(HelperMethods.StringFormat(
                         CultureInfo.CurrentCulture,
                         "CloseConnection: {0}, exception: {1}",
-                        handle, e)); /* throw */
+                        handle, e), TraceCategory.Handle); /* throw */
                 }
                 catch
                 {
@@ -5989,10 +5852,10 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_HANDLE
                     try
                     {
-                        Trace.WriteLine(HelperMethods.StringFormat(
+                        HelperMethods.Trace(HelperMethods.StringFormat(
                             CultureInfo.CurrentCulture,
                             "MatchVersion: {0} (statement handle)",
-                            localHandle)); /* throw */
+                            localHandle), TraceCategory.Handle); /* throw */
                     }
                     catch
                     {
@@ -6011,9 +5874,10 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_HANDLE
                 try
                 {
-                    Trace.WriteLine(HelperMethods.StringFormat(
+                    HelperMethods.Trace(HelperMethods.StringFormat(
                         CultureInfo.CurrentCulture,
-                        "FinalizeStatement: {0}", localHandle)); /* throw */
+                        "FinalizeStatement: {0}", localHandle),
+                        TraceCategory.Handle); /* throw */
                 }
                 catch
                 {
@@ -6045,10 +5909,10 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_HANDLE
                 try
                 {
-                    Trace.WriteLine(HelperMethods.StringFormat(
+                    HelperMethods.Trace(HelperMethods.StringFormat(
                         CultureInfo.CurrentCulture,
                         "FinalizeStatement: {0}, exception: {1}",
-                        handle, e)); /* throw */
+                        handle, e), TraceCategory.Handle); /* throw */
                 }
                 catch
                 {
@@ -6223,10 +6087,10 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_HANDLE
                     try
                     {
-                        Trace.WriteLine(HelperMethods.StringFormat(
+                        HelperMethods.Trace(HelperMethods.StringFormat(
                             CultureInfo.CurrentCulture,
                             "MatchVersion: {0} (backup handle)",
-                            localHandle)); /* throw */
+                            localHandle), TraceCategory.Handle); /* throw */
                     }
                     catch
                     {
@@ -6245,9 +6109,10 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_HANDLE
                 try
                 {
-                    Trace.WriteLine(HelperMethods.StringFormat(
+                    HelperMethods.Trace(HelperMethods.StringFormat(
                         CultureInfo.CurrentCulture,
-                        "FinishBackup: {0}", localHandle)); /* throw */
+                        "FinishBackup: {0}", localHandle),
+                        TraceCategory.Handle); /* throw */
                 }
                 catch
                 {
@@ -6279,10 +6144,10 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_HANDLE
                 try
                 {
-                    Trace.WriteLine(HelperMethods.StringFormat(
+                    HelperMethods.Trace(HelperMethods.StringFormat(
                         CultureInfo.CurrentCulture,
                         "FinishBackup: {0}, exception: {1}",
-                        handle, e)); /* throw */
+                        handle, e), TraceCategory.Handle); /* throw */
                 }
                 catch
                 {
@@ -6457,10 +6322,10 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_HANDLE
                     try
                     {
-                        Trace.WriteLine(HelperMethods.StringFormat(
+                        HelperMethods.Trace(HelperMethods.StringFormat(
                             CultureInfo.CurrentCulture,
                             "MatchVersion: {0} (blob handle)",
-                            localHandle)); /* throw */
+                            localHandle), TraceCategory.Handle); /* throw */
                     }
                     catch
                     {
@@ -6479,9 +6344,10 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_HANDLE
                 try
                 {
-                    Trace.WriteLine(HelperMethods.StringFormat(
+                    HelperMethods.Trace(HelperMethods.StringFormat(
                         CultureInfo.CurrentCulture,
-                        "CloseBlob: {0}", localHandle)); /* throw */
+                        "CloseBlob: {0}", localHandle),
+                        TraceCategory.Handle); /* throw */
                 }
                 catch
                 {
@@ -6513,10 +6379,10 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_HANDLE
                 try
                 {
-                    Trace.WriteLine(HelperMethods.StringFormat(
+                    HelperMethods.Trace(HelperMethods.StringFormat(
                         CultureInfo.CurrentCulture,
                         "CloseBlob: {0}, exception: {1}",
-                        handle, e)); /* throw */
+                        handle, e), TraceCategory.Handle); /* throw */
                 }
                 catch
                 {
