@@ -665,6 +665,14 @@ namespace eval ::Eagle {
       }
     }
 
+    proc getSQLiteHtmlHelpPath {} {
+      #
+      # NOTE: Figure out the directory where all the HtmlHelp files should
+      #       be located.
+      #
+      return [file join [file dirname $::path] Externals HtmlHelp]
+    }
+
     proc getSQLiteTestDataPath {} {
       #
       # NOTE: Figure out the directory where all the test data files should
@@ -1948,12 +1956,13 @@ namespace eval ::Eagle {
 
         if {![info exists ::no(shimSQLiteDefineConstantConstraints)]} then {
           set defineConstants [list \
-              INTEROP_EXTENSION_FUNCTIONS INTEROP_FTS5_EXTENSION \
-              INTEROP_JSON1_EXTENSION INTEROP_PERCENTILE_EXTENSION \
-              INTEROP_REGEXP_EXTENSION INTEROP_TEST_EXTENSION \
-              INTEROP_SESSION_EXTENSION INTEROP_SHA1_EXTENSION \
-              INTEROP_SHA3_EXTENSION INTEROP_TOTYPE_EXTENSION \
-              INTEROP_VIRTUAL_TABLE USE_INTEROP_DLL]
+              INTEROP_COMPRESS_EXTENSION INTEROP_EXTENSION_FUNCTIONS \
+              INTEROP_FTS5_EXTENSION INTEROP_JSON1_EXTENSION \
+              INTEROP_PERCENTILE_EXTENSION INTEROP_REGEXP_EXTENSION \
+              INTEROP_TEST_EXTENSION INTEROP_SESSION_EXTENSION \
+              INTEROP_SHA1_EXTENSION INTEROP_SHA3_EXTENSION \
+              INTEROP_TOTYPE_EXTENSION INTEROP_VIRTUAL_TABLE \
+              INTEROP_ZIPFILE_EXTENSION USE_INTEROP_DLL]
 
           foreach defineConstant $defineConstants {
             addConstraint [appendArgs \
@@ -2292,8 +2301,17 @@ namespace eval ::Eagle {
           "\"... "]
 
       if {[catch {
-        object invoke -flags +NonPublic \
-            System.Data.SQLite.SQLite3 DefineConstants
+        if {[string match INTEROP_* $name]} then {
+          #
+          # HACK: Use unified define constants list that takes into
+          #       account both the managed and interop assemblies.
+          #
+          object invoke -flags +NonPublic \
+              System.Data.SQLite.SQLite3 DefineConstants
+        } else {
+          object invoke -flags +NonPublic \
+              System.Data.SQLite.SQLite3 ProviderDefineConstants
+        }
       } defineConstants] == 0} then {
         if {[lsearch -exact -nocase $defineConstants $name] != -1} then {
           #
@@ -2359,7 +2377,7 @@ namespace eval ::Eagle {
       }
     }
 
-    proc getDateTimeFormat { {timeZone true} } {
+    proc getDateTimeFormat { {milliseconds false} {timeZone true} } {
       #
       # NOTE: This procedure simply returns the "default" DateTime format used
       #       by the test suite.
@@ -2377,8 +2395,19 @@ namespace eval ::Eagle {
         #       DateTime class of the framework.  If this value is changed,
         #       various tests may fail.
         #
-        return [appendArgs \
-            "yyyy-MM-dd HH:mm:ss.FFFFFFF" [expr {$timeZone ? "K" : ""}]]
+        set result "yyyy-MM-dd HH:mm:ss."
+
+        if {$milliseconds} then {
+          append result fffffff
+        } else {
+          append result FFFFFFF
+        }
+
+        if {$timeZone} then {
+          append result K
+        }
+
+        return $result
       }
     }
 
@@ -3135,6 +3164,34 @@ namespace eval ::Eagle {
       }
 
       return ""
+    }
+
+    proc getFlagsRegExp { wrap args } {
+      package require Eagle.Test.Constraints
+
+      set result ""
+
+      foreach arg [lpermute $args] {
+        if {[string length $result] > 0} then {
+          append result |
+        }
+
+        append result [join $arg ", "]
+      }
+
+      set length [llength $args]
+
+      if {$wrap} then {
+        set result [appendArgs ^ $result \$]
+      } else {
+        if {$length > 1} then {
+          set result [appendArgs \\\{(?: $result )\\\}]
+        } else {
+          set result [appendArgs (?: $result )]
+        }
+      }
+
+      return $result
     }
 
     proc getExtraProperties { {extra ""} {quiet false} } {
@@ -5086,6 +5143,24 @@ namespace eval ::Eagle {
           set ::test_log_path $path
         }
 
+        #
+        # NOTE: Since renaming the test log file during a test run
+        #       is unusual -AND- this condition cannot be detected
+        #       by the core script library without our help, issue
+        #       the manual notification to the core script library
+        #       now.
+        #
+        if {[llength [info commands ::newTestLog]] > 0} then {
+          if {[catch {
+            ::newTestLog $old_test_log $new_test_log
+          } error] == 0} then {
+            host result Ok ">>>> NEW TEST LOG FILE OK\n"
+          } else {
+            host result Error [appendArgs \
+                ">>>> NEW TEST LOG FILE ERROR: " $error \n]
+          }
+        }
+
         tputs $::test_channel [appendArgs \
             "---- moved test log from \"" $old_test_log "\" to \"" \
             $new_test_log \"\n]
@@ -5952,7 +6027,7 @@ namespace eval ::Eagle {
 
           if {[catch {
             object invoke -flags +NonPublic \
-                System.Data.SQLite.SQLite3 DefineConstants
+                System.Data.SQLite.SQLite3 ProviderDefineConstants
           } defineConstants] == 0} then {
             tputs $::test_channel [appendArgs [formatList [lsort \
                 $defineConstants] <none>] \n]
@@ -6056,14 +6131,15 @@ namespace eval ::Eagle {
         #
         set defineConstants [list \
             CHECK_STATE COUNT_HANDLE DEBUG INTEROP_CODEC INTEROP_DEBUG \
-            INTEROP_EXTENSION_FUNCTIONS INTEROP_FTS5_EXTENSION \
-            INTEROP_INCLUDE_CEROD INTEROP_INCLUDE_EXTRA INTEROP_INCLUDE_SEE \
+            INTEROP_COMPRESS_EXTENSION INTEROP_EXTENSION_FUNCTIONS \
+            INTEROP_FTS5_EXTENSION INTEROP_INCLUDE_CEROD \
+            INTEROP_INCLUDE_EXTRA INTEROP_INCLUDE_SEE \
             INTEROP_INCLUDE_ZIPVFS INTEROP_JSON1_EXTENSION \
             INTEROP_LEGACY_CLOSE INTEROP_LOG INTEROP_PERCENTILE_EXTENSION \
             INTEROP_REGEXP_EXTENSION INTEROP_SESSION_EXTENSION \
             INTEROP_SHA1_EXTENSION INTEROP_SHA3_EXTENSION \
             INTEROP_TEST_EXTENSION INTEROP_TOTYPE_EXTENSION \
-            INTEROP_VIRTUAL_TABLE \
+            INTEROP_ZIPFILE_EXTENSION INTEROP_VIRTUAL_TABLE \
             NET_20 NET_35 NET_40 NET_45 NET_451 NET_452 NET_46 NET_461 \
             NET_462 NET_47 NET_471 NET_472 NET_48 NET_COMPACT_20 \
             NET_STANDARD_20 NET_STANDARD_21 PLATFORM_COMPACTFRAMEWORK \
@@ -6235,6 +6311,21 @@ namespace eval ::Eagle {
           }
         }
 
+        catch {
+          tputs $::test_channel \
+              "---- shared define constants for SQLite... "
+
+          if {[catch {
+            object invoke -flags +NonPublic \
+                System.Data.SQLite.SQLite3 DefineConstants
+          } defineConstants] == 0} then {
+            tputs $::test_channel [appendArgs [formatList [lsort \
+                $defineConstants] <none>] \n]
+          } else {
+            tputs $::test_channel unknown\n
+          }
+        }
+
         #
         # NOTE: Show the active test constraints.
         #
@@ -6335,8 +6426,8 @@ namespace eval ::Eagle {
               [getSQLiteTestDataPath] wal.db]]
 
           #
-          # NOTE: The various install/uninstall log files used to test the
-          #       design-time component installer.
+          # NOTE: The various install/uninstall log files used to test
+          #       the design-time component installer.
           #
           set testInstallVs2005LogFile [file nativename [file join \
               [getSQLiteTestDataPath] Installer_Test_Vs2005.log]]
@@ -6379,6 +6470,16 @@ namespace eval ::Eagle {
 
           set testUninstallVs2017LogFile [file nativename [file join \
               [getSQLiteTestDataPath] Uninstaller_Test_Vs2017.log]]
+
+          #####################################################################
+
+          #
+          # NOTE: Contains the fully qualified file name for the HtmlHelp
+          #       documentation zip file that should be checked into this
+          #       repository.
+          #
+          set htmlHelpDocsZipFile [file nativename [file join \
+              [getSQLiteHtmlHelpPath] HelpDocs.zip]]
 
           #####################################################################
 
@@ -6533,6 +6634,11 @@ namespace eval ::Eagle {
                 [file tail $testUninstallVs2017LogFile]]]} then {
               checkForFile $test_channel $testUninstallVs2017LogFile
             }
+
+            if {![haveConstraint [appendArgs file_ \
+                [file tail $htmlHelpDocsZipFile]]]} then {
+              checkForFile $test_channel $htmlHelpDocsZipFile
+            }
           }
         }
       }
@@ -6610,6 +6716,7 @@ namespace eval ::Eagle {
       if {![info exists ::no(epilogue.eagle)]} then {
         uplevel 1 {
           unset -nocomplain \
+              htmlHelpDocsZipFile \
               testUninstallVs2017LogFile testUninstallVs2015LogFile \
               testUninstallVs2013LogFile testUninstallVs2012LogFile \
               testUninstallVs2010LogFile testUninstallVs2008LogFile \

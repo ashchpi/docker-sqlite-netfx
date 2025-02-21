@@ -131,12 +131,59 @@ Built-In Scalar SQL Functions
 <p>The core functions shown below are available by default. 
 <a href="lang_datefunc.html">Date &amp; Time functions</a>,
 <a href="lang_aggfunc.html">aggregate functions</a>,
-<a href="windowfunctions.html#biwinfunc">window functions</a>,
+<a href="windowfunctions.html">window functions</a>,
 <a href="lang_mathfunc.html">math functions</a>, and
 <a href="json1.html">JSON functions</a> are documented separately.  An
 application may define additional
 functions written in C and added to the database engine using
 the <a href="c3ref/create_function.html">sqlite3_create_function()</a> API.</p>
+
+<p><b><a href="syntax/simple-function-invocation.html">simple-function-invocation:</a></b></p><div class='imgcontainer'>
+ <div style="max-width:414px"><svg xmlns='http://www.w3.org/2000/svg' class="pikchr" viewBox="0 0 414.49 126.792">
+<circle cx="5" cy="55" r="3.6"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
+<polygon points="32,55 20,59 20,50" style="fill:rgb(0,0,0)"/>
+<path d="M9,55L26,55"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
+<path d="M47,70L126,70A15 15 0 0 0 141 55A15 15 0 0 0 126 39L47,39A15 15 0 0 0 32 55A15 15 0 0 0 47 70Z"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
+<text x="86" y="55" text-anchor="middle" fill="rgb(0,0,0)" dominant-baseline="central">simple-func</text>
+<polygon points="164,55 152,59 152,50" style="fill:rgb(0,0,0)"/>
+<path d="M141,55L158,55"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
+<path d="M179,70A15 15 0 0 0 194 55A15 15 0 0 0 179 39A15 15 0 0 0 164 55A15 15 0 0 0 179 70Z"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
+<text x="179" y="55" text-anchor="middle" font-weight="bold" fill="rgb(0,0,0)" dominant-baseline="central">(</text>
+<polygon points="248,55 237,59 237,50" style="fill:rgb(0,0,0)"/>
+<path d="M194,55L242,55"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
+<path d="M248,70L297,70L297,39L248,39Z"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
+<text x="273" y="55" text-anchor="middle" fill="rgb(0,0,0)" dominant-baseline="central">expr</text>
+<polygon points="351,55 340,59 340,50" style="fill:rgb(0,0,0)"/>
+<path d="M297,55L346,55"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
+<path d="M366,70A15 15 0 0 0 382 55A15 15 0 0 0 366 39A15 15 0 0 0 351 55A15 15 0 0 0 366 70Z"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
+<text x="366" y="55" text-anchor="middle" font-weight="bold" fill="rgb(0,0,0)" dominant-baseline="central">)</text>
+<polygon points="405,55 393,59 393,50" style="fill:rgb(0,0,0)"/>
+<path d="M382,55L399,55"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
+<circle cx="408" cy="55" r="3.6"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
+<path d="M273,32A15 15 0 0 0 288 17L288,17A15 15 0 0 0 273 2A15 15 0 0 0 258 17L258,17A15 15 0 0 0 273 32Z"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
+<text x="273" y="17" text-anchor="middle" font-weight="bold" fill="rgb(0,0,0)" dominant-baseline="central">,</text>
+<polygon points="288,17 299,12 299,21" style="fill:rgb(0,0,0)"/>
+<path d="M297,55 L 305,55 Q 312,55 312,40 L 312,32 Q 312,17 303,17 L 294,17"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
+<path d="M258,17 L 237,17 Q 222,17 222,32 L 222,40 Q 222,55 229,55 L 237,55"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
+<polygon points="273,82 261,86 261,77" style="fill:rgb(0,0,0)"/>
+<path d="M194,55 L 202,55 Q 209,55 209,68 Q 209,82 224,82 L 252,82 L 267,82"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
+<path d="M273,82 L 310,82 Q 325,82 325,68 Q 325,55 332,55 L 340,55"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
+<path d="M273,124A15 15 0 0 0 288 109A15 15 0 0 0 273 94A15 15 0 0 0 258 109A15 15 0 0 0 273 124Z"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
+<text x="273" y="109" text-anchor="middle" font-weight="bold" fill="rgb(0,0,0)" dominant-baseline="central">*</text>
+<polygon points="258,109 246,113 246,105" style="fill:rgb(0,0,0)"/>
+<path d="M194,55 L 202,55 Q 209,55 209,70 L 209,94 Q 209,109 224,109 L 237,109 L 252,109"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
+<path d="M288,109 L 310,109 Q 325,109 325,94 L 325,85 L 325,70"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
+</svg>
+</div>
+ </div>
+
+
+<p>
+See the <a href="lang_expr.html#*funcinexpr">functions within expressions</a> documentation for
+more information about how SQL function invocations fit into the context
+of an SQL expression.
+
+</p><h1 id="list_of_core_functions"><span>2. </span>List Of Core Functions</h1>
 
 <p>
 <div class='columns' style='columns: 15em auto;'>
@@ -145,6 +192,8 @@ the <a href="c3ref/create_function.html">sqlite3_create_function()</a> API.</p>
 <li><a href='lang_corefunc.html#changes'>changes()</a></li>
 <li><a href='lang_corefunc.html#char'>char(X1,X2,...,XN)</a></li>
 <li><a href='lang_corefunc.html#coalesce'>coalesce(X,Y,...)</a></li>
+<li><a href='lang_corefunc.html#concat'>concat(X,...)</a></li>
+<li><a href='lang_corefunc.html#concat_ws'>concat_ws(SEP,X,...)</a></li>
 <li><a href='lang_corefunc.html#format'>format(FORMAT,...)</a></li>
 <li><a href='lang_corefunc.html#glob'>glob(X,Y)</a></li>
 <li><a href='lang_corefunc.html#hex'>hex(X)</a></li>
@@ -165,6 +214,7 @@ the <a href="c3ref/create_function.html">sqlite3_create_function()</a> API.</p>
 <li><a href='lang_corefunc.html#max_scalar'>max(X,Y,...)</a></li>
 <li><a href='lang_corefunc.html#min_scalar'>min(X,Y,...)</a></li>
 <li><a href='lang_corefunc.html#nullif'>nullif(X,Y)</a></li>
+<li><a href='lang_corefunc.html#octet_length'>octet_length(X)</a></li>
 <li><a href='lang_corefunc.html#printf'>printf(FORMAT,...)</a></li>
 <li><a href='lang_corefunc.html#quote'>quote(X)</a></li>
 <li><a href='lang_corefunc.html#random'>random()</a></li>
@@ -199,15 +249,15 @@ the <a href="c3ref/create_function.html">sqlite3_create_function()</a> API.</p>
 </div>
 
 
-<h1 id="descriptions_of_built_in_scalar_sql_functions"><span>2. </span>Descriptions of built-in scalar SQL functions</h1>
+<h1 id="descriptions_of_built_in_scalar_sql_functions"><span>3. </span>Descriptions of built-in scalar SQL functions</h1>
 <dl>
 
 <a name="abs"></a>
 <dt><p><b>abs(<i>X</i>)</b></dt><dd><p>
   The abs(X) function returns the absolute value of the numeric
-  argument X.  Abs(X) returns NULL if X is NULL. 
+  argument X.  Abs(X) returns NULL if X is NULL.
   Abs(X) returns 0.0 if X is a string or blob
-  that cannot be converted to a numeric value.  If X is the 
+  that cannot be converted to a numeric value.  If X is the
   integer -9223372036854775808 then abs(X) throws an integer overflow
   error since there is no equivalent positive 64-bit two complement value.
 </dd>
@@ -229,6 +279,20 @@ the <a href="c3ref/create_function.html">sqlite3_create_function()</a> API.</p>
   The coalesce() function returns a copy of its first non-NULL argument, or
   NULL if all arguments are NULL.  Coalesce() must have at least 
   2 arguments.
+</dd>
+<a name="concat"></a>
+<dt><p><b>concat(<i>X</i>,...)</b></dt><dd><p>
+  The concat(...) function returns a string which is the concatenation of the
+  string representation of all of its non-NULL arguments.  If all arguments are
+  NULL, then concat() returns an empty string.
+</dd>
+<a name="concat_ws"></a>
+<dt><p><b>concat_ws(<i>SEP</i>,<i>X</i>,...)</b></dt><dd><p>
+  The concat_ws(SEP,...) function returns a string that is the concatenation of
+  all non-null arguments beyond the first argument, using the text value of the
+  first argument as a separator.  If the first argument is NULL, then concat_ws()
+  returns NULL.  If all arguments other than the first are NULL, then concat_ws()
+  returns an empty string.
 </dd>
 <a name="format"></a>
 <dt><p><b>format(<i>FORMAT</i>,...)</b></dt><dd><p>
@@ -320,7 +384,8 @@ the <a href="c3ref/create_function.html">sqlite3_create_function()</a> API.</p>
   length of the string, not the byte length.  The character length is the number
   of characters in the string.  The character length is always different from
   the byte length for UTF-16 strings, and can be different from the byte length
-  for UTF-8 strings if the string contains multi-byte characters.
+  for UTF-8 strings if the string contains multi-byte characters.  Use the
+  <a href="lang_corefunc.html#octet_length">octet_length()</a> function to find the byte length of a string.
   <p>
   For BLOB values, length(X) always returns the byte-length of the BLOB.
   <p>
@@ -445,12 +510,30 @@ the <a href="c3ref/create_function.html">sqlite3_create_function()</a> API.</p>
   comparisons.  If neither argument to nullif() defines a collating function
   then the BINARY collating function is used.
 </dd>
+<a name="octet_length"></a>
+<dt><p><b>octet_length(<i>X</i>)</b></dt><dd><p>
+  The octet_length(X) function returns the number of bytes in the encoding
+  of text string X.  If X is NULL then octet_length(X) returns NULL.  If X is
+  a BLOB value, then octet_length(X) is the same as <a href="lang_corefunc.html#length">length(X)</a>.  If X is a
+  numeric value, then octet_length(X) returns the number of bytes in a text
+  rendering of that number.
+  <p>
+  Because octet_length(X) returns the number of bytes in X, not the number
+  of characters, the value returned depends on the database encoding.  The
+  octet_length() function can return different answers for the same input string
+  if the database encoding is UTF16 instead of UTF8.
+  <p>
+  If argument X is a table column and the value is of type text or blob,
+  then octet_length(X) avoids reading the content of X from disk, as the byte
+  length can be computed from metadata.  Thus, octet_length(X) is efficient
+  even if X is a column containing a multi-megabyte text or blob value.
+</dd>
 <a name="printf"></a>
 <dt><p><b>printf(<i>FORMAT</i>,...)</b></dt><dd><p>
   The printf() SQL function is an alias for the <a href="lang_corefunc.html#format">format() SQL function</a>.
-  The format() SQL function was original named printf(). But the name was later
-  changed to format() for compatibility with other database engines.  The original
-  printf() name is retained as an alias so as not to break any legacy code.
+  The format() SQL function was originally named printf(). But the name was
+  later changed to format() for compatibility with other database engines.
+  The printf() name is retained as an alias so as not to break legacy code.
 </dd>
 <a name="quote"></a>
 <dt><p><b>quote(<i>X</i>)</b></dt><dd><p>
@@ -650,5 +733,5 @@ the <a href="c3ref/create_function.html">sqlite3_create_function()</a> API.</p>
 </dd>
 
 </dl>
-<p align="center"><small><i>This page last modified on  <a href="https://sqlite.org/docsrc/honeypot" id="mtimelink"  data-href="https://sqlite.org/docsrc/finfo/pages/lang_corefunc.in?m=1a94b5b49f">2023-01-27 13:42:47</a> UTC </small></i></p>
+<p align="center"><small><i>This page last modified on  <a href="https://sqlite.org/docsrc/honeypot" id="mtimelink"  data-href="https://sqlite.org/docsrc/finfo/pages/lang_corefunc.in?m=a451f26240">2023-12-05 14:43:20</a> UTC </small></i></p>
 

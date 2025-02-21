@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="Windows-1252"?>
+<!--
+ *
+ * Release.vsprops -
+ *
+ * Written by Joe Mistachkin.
+ * Released to the public domain, use at your own risk!
+ *
+-->
+<VisualStudioPropertySheet
+	ProjectType="Visual C++"
+	Version="8.00"
+	Name="Release"
+	>
+	<UserMacro
+		Name="BaseConfigurationName"
+		Value="Release"
+		PerformEnvironmentSet="true"
+	/>
+</VisualStudioPropertySheet>

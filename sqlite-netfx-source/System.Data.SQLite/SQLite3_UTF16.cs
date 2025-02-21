@@ -169,18 +169,21 @@ namespace System.Data.SQLite
       {
         _sql = SQLiteConnectionPool.Remove(strFilename, maxPoolSize, out _poolVersion);
 
-        SQLiteConnection.OnChanged(null, new ConnectionEventArgs(
-            SQLiteConnectionEventType.OpenedFromPool, null, null,
-            null, null, _sql, strFilename, new object[] {
-            typeof(SQLite3_UTF16), strFilename, vfsName,
-            connectionFlags, openFlags, maxPoolSize, usePool,
-            _poolVersion }));
+        if (SQLiteConnection.CanOnChanged(null, false))
+        {
+            SQLiteConnection.OnChanged(null, new ConnectionEventArgs(
+                SQLiteConnectionEventType.OpenedFromPool, null, null,
+                null, null, _sql, strFilename, new object[] {
+                typeof(SQLite3_UTF16), strFilename, vfsName,
+                connectionFlags, openFlags, maxPoolSize, usePool,
+                _poolVersion }));
+        }
 
 #if !NET_COMPACT_20 && TRACE_CONNECTION
-        Trace.WriteLine(HelperMethods.StringFormat(
+        HelperMethods.Trace(HelperMethods.StringFormat(
             CultureInfo.CurrentCulture,
             "Open16 (Pool): {0}",
-            HandleToString()));
+            HandleToString()), TraceCategory.Connection);
 #endif
       }
 
@@ -226,9 +229,9 @@ namespace System.Data.SQLite
 #endif
 
 #if !NET_COMPACT_20 && TRACE_CONNECTION
-          Trace.WriteLine(HelperMethods.StringFormat(
+          HelperMethods.Trace(HelperMethods.StringFormat(
               CultureInfo.CurrentCulture,
-              "Open16: {0}", db));
+              "Open16: {0}", db), TraceCategory.Connection);
 #endif
 
           if (n != SQLiteErrorCode.Ok) throw new SQLiteException(n, null);
@@ -237,11 +240,14 @@ namespace System.Data.SQLite
         }
         lock (_sql) { /* HACK: Force the SyncBlock to be "created" now. */ }
 
-        SQLiteConnection.OnChanged(null, new ConnectionEventArgs(
-            SQLiteConnectionEventType.NewCriticalHandle, null,
-            null, null, null, _sql, strFilename, new object[] {
-            typeof(SQLite3_UTF16), strFilename, vfsName,
-            connectionFlags, openFlags, maxPoolSize, usePool }));
+        if (SQLiteConnection.CanOnChanged(null, false))
+        {
+            SQLiteConnection.OnChanged(null, new ConnectionEventArgs(
+                SQLiteConnectionEventType.NewCriticalHandle, null,
+                null, null, null, _sql, strFilename, new object[] {
+                typeof(SQLite3_UTF16), strFilename, vfsName,
+                connectionFlags, openFlags, maxPoolSize, usePool }));
+        }
       }
 
       // Bind functions to this connection.  If any previous functions of the same name

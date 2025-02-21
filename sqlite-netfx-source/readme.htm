@@ -5,8 +5,8 @@
 </head>
 <body>
 ADO.NET SQLite Data Provider<br />
-Version 1.0.118.0 - June 10, 2023<br />
-Using <a href="https://www.sqlite.org/releaselog/3_42_0.html">SQLite 3.42.0</a><br />Originally written by Robert Simpson<br />
+Version 1.0.119.0 - September 29, 2024<br />
+Using <a href="https://www.sqlite.org/releaselog/3_46_1.html">SQLite 3.46.1</a><br />Originally written by Robert Simpson<br />
 Released to the public domain, use at your own risk!<br />
 Official provider website:&nbsp;<a href="https://system.data.sqlite.org/">https://system.data.sqlite.org/</a><br />
 Legacy versions:&nbsp;<a href="https://sourceforge.net/projects/sqlite-dotnet2/">https://sourceforge.net/projects/sqlite-dotnet2/</a><br />
@@ -145,7 +145,7 @@ app.config file:<br />
         &lt;DbProviderFactories&gt;
             &lt;remove invariant="System.Data.SQLite" /&gt;
             &lt;add name="SQLite Data Provider" invariant="System.Data.SQLite" description=".NET Framework Data Provider for SQLite"
-                 type="System.Data.SQLite.SQLiteFactory, System.Data.SQLite, Version=1.0.118.0, Culture=neutral, PublicKeyToken=db937bc2d44ff139" /&gt;
+                 type="System.Data.SQLite.SQLiteFactory, System.Data.SQLite, Version=1.0.119.0, Culture=neutral, PublicKeyToken=db937bc2d44ff139" /&gt;
         &lt;/DbProviderFactories&gt;
     &lt;/system.data&gt;
 &lt;/configuration&gt;
@@ -207,6 +207,27 @@ released versions of System.Data.SQLite.
 
 <h2><b>Version History</b></h2>
 
+<p>
+    <b>1.0.119.0 - September 29, 2024</b>
+</p>
+<ul>
+    <li>Updated to <a href="https://www.sqlite.org/releaselog/3_46_1.html">SQLite 3.46.1</a>.</li>
+    <li>Update internal resource list of reserved SQL words.</li>
+    <li>Add experimental support for using NuGet runtime identifiers to help locate the interop assembly. Pursuant to forum post [3757f4365b].</li>
+    <li>Avoid NullReferenceException from Path.Combine method when the PublishSingleFile property is enabled for a project. Pursuant to forum post [66a0d2716a].</li>
+    <li>Avoid setting up for the Changed event when it will not be fired. Pursuant to forum post [25cafb35e5].</li>
+    <li>Add the Serialize and Deserialize methods to the SQLiteConnection class.</li>
+    <li>Add the Tag property to the SQLiteConnection class.</li>
+    <li>Add the VfsName connection string property.</li>
+    <li>Add the IncludeDefaultFlags connection string property, enabled by default.&nbsp;<b>** Potentially Incompatible Change **</b></li>
+    <li>Add the ConnectionPoolOnly and AggressiveDisposal connection flags.&nbsp;<b>** Potentially Incompatible Change **</b></li>
+    <li>Add the &quot;compress&quot; and &quot;zipfile&quot; extensions to the interop assembly.</li>
+    <li>Add the GetPasswordCallback property to the SQLiteConnection class for use with <a href="https://www.sqlite.org/see">SEE</a>.</li>
+    <li>Add the NoCase property to the SQLiteParameterCollection class.</li>
+    <li>Fix rarely seen NullReferenceException in the StaticWeakConnectionPool.Add method.</li>
+    <li>Revise the calculation used to bind DateTime values. Fix for [bbddfeb773].</li>
+    <li>Fix support for unnamed parameters using the ?NNN syntax. Pursuant to forum post [76cb35b58d].</li>
+</ul>
 <p>
     <b>1.0.118.0 - June 10, 2023</b>
 </p>
@@ -279,7 +300,7 @@ released versions of System.Data.SQLite.
     <b>1.0.112.3 - Xxxx XX, 2020</b>
 </p>
 <ul>
-    <li>When using the (unsupported) legacy CryptoAPI based codec, skip encrypting page #1 because that can lead to database corruption and other malfunctions.</li>
+    <li>When using the (unsupported) legacy CryptoAPI-based (RC4) codec, skip encrypting page #1 because that can lead to database corruption and other malfunctions.</li>
     <li>Add SQLite_ForceLogLifecycle environment variable to force logging of calls into key members pertaining to the lifecycle of connections and their associated classes (e.g. LINQ, EF6, etc).</li>
     <li>Support automatic value conversions for columns with a declared type of MEDIUMINT or MEDIUMUINT. Pursuant to [515cb60b10].</li>
 </ul>
@@ -446,7 +467,7 @@ released versions of System.Data.SQLite.
     <li>Add NoVerifyTextAffinity connection flag to skip type affinity checking when fetching a column value as a string. Pursuant to [dbd65441a5].</li>
     <li>The UnixEpoch DateTime format should use Int64 internally, not Int32.&nbsp;<b>** Potentially Incompatible Change **</b></li>
     <li>Avoid using Path.Combine with null values in the native library pre-loader. Fix for [da685c0bac].</li>
-    <li>Fix the (unsupported) legacy CryptoAPI based codec so that it no longer prevents page size changes.</li>
+    <li>Fix the (unsupported) legacy CryptoAPI-based (RC4) codec so that it no longer prevents page size changes.</li>
 </ul>
 <p>
     <b>1.0.99.1 - March 31, 2016</b>
@@ -491,7 +512,7 @@ released versions of System.Data.SQLite.
     <li>Add VfsName connection string property to allow a non-default VFS to be used by the SQLite core library.</li>
     <li>Add BusyTimeout connection string property to set the busy timeout to be used by the SQLite core library.</li>
     <li>Add UnbindFunction and UnbindAllFunctions methods to the SQLiteConnection class.</li>
-    <li>Enable integration with the <a href="http://www.hwaci.com/sw/sqlite/zipvfs.html">ZipVFS</a> extension.</li>
+    <li>Enable integration with the <a href="https://www.hwaci.com/sw/sqlite/zipvfs.html">ZipVFS</a> extension.</li>
 </ul>
 <p>
     <b>1.0.97.0 - May 26, 2015</b>
@@ -765,7 +786,7 @@ released versions of System.Data.SQLite.
 </p>
 <ul>
     <li>Updated to <a href="https://www.sqlite.org/releaselog/3_7_12_1.html">SQLite 3.7.12.1</a>.</li>
-    <li>Support compiling the interop assembly without support for the custom extension functions and the CryptoAPI based codec.</li>
+    <li>Support compiling the interop assembly without support for the custom extension functions and the CryptoAPI-based (RC4) codec.</li>
     <li>Add DefineConstants property to the SQLiteConnection class to return the list of define constants used when compiling the core managed assembly.</li>
     <li>Add release archive verification tool to the release automation.</li>
     <li>Fix NullReferenceException when calling the SQLiteDataAdapter.FillSchema method on a query that returns multiple result sets. Fix for [3aa50d8413].</li>
@@ -870,7 +891,7 @@ released versions of System.Data.SQLite.
     <li>Add Changes and LastInsertRowId properties to the connection class.</li>
     <li>Support more formats when converting data from/to the DateTime type.</li>
     <li>Make all the assembly versioning attributes consistent.</li>
-    <li>Add unit testing infrastructure using <a href="http://eagle.to/">Eagle</a>.</li>
+    <li>Add unit testing infrastructure using <a href="https://eagle.to/">Eagle</a>.</li>
     <li>Integrate all legacy unit tests, including the &quot;testlinq&quot; project, into the new test suite.</li>
     <li>Add projects to build the interop assembly statically linked to the Visual C++ runtime. Fix for [53f0c5cbf6].</li>
     <li>Add SQLITE_ENABLE_STAT2 compile-time option to the interop assembly. Fix for [74807fbf27].</li>

@@ -99,7 +99,19 @@ namespace System.Data.SQLite
     /// audited and found to be free of potentially security-adverse side-effects
     /// and information-leaks.
     /// </summary>
-    SQLITE_INNOCUOUS = 0x200000
+    SQLITE_INNOCUOUS = 0x200000,
+    /// <summary>
+    /// The SQLITE_RESULT_SUBTYPE flag indicates to SQLite that a function
+    /// might call sqlite3_result_subtype() to cause a sub-type to be
+    /// associated with its result.  Every function that invokes
+    /// sqlite3_result_subtype() should have this property.  If it does not,
+    /// then the call to sqlite3_result_subtype() might become a no-op if the
+    /// function is used as term in an expression index.  On the other hand,
+    /// SQL functions that never invoke sqlite3_result_subtype() should avoid
+    /// setting this property, as the purpose of this property is to disable
+    /// certain optimizations that are incompatible with subtypes.
+    /// </summary>
+    SQLITE_RESULT_SUBTYPE = 0x1000000
   }
 
   /// <summary>

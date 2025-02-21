@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+ *
+ * Debug.props -
+ *
+ * Written by Joe Mistachkin.
+ * Released to the public domain, use at your own risk!
+ *
+-->
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <PropertyGroup Label="UserMacros">
+    <BaseConfiguration>Debug</BaseConfiguration>
+  </PropertyGroup>
+  <ItemGroup>
+    <BuildMacro Include="BaseConfiguration">
+      <Value>$(BaseConfiguration)</Value>
+      <EnvironmentVariable>true</EnvironmentVariable>
+    </BuildMacro>
+  </ItemGroup>
+</Project>

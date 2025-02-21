@@ -47,6 +47,7 @@ Externals/Eagle/lib/Eagle1.0/embed.eagle
 Externals/Eagle/lib/Eagle1.0/exec.eagle
 Externals/Eagle/lib/Eagle1.0/file1.eagle
 Externals/Eagle/lib/Eagle1.0/file2.eagle
+Externals/Eagle/lib/Eagle1.0/file2u.eagle
 Externals/Eagle/lib/Eagle1.0/file3.eagle
 Externals/Eagle/lib/Eagle1.0/info.eagle
 Externals/Eagle/lib/Eagle1.0/init.eagle
@@ -76,6 +77,7 @@ Externals/NDoc3/*
 Externals/NuGet/*
 Externals/ResGen/*
 Externals/vswhere/*
+Externals/zlib/*
 obj/*
 Setup/Output/*
 Setup/set_user_*.bat

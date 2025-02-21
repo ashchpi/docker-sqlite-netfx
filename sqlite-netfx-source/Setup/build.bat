@@ -9,7 +9,12 @@
 :: Released to the public domain, use at your own risk!
 ::
 
+REM ****************************************************************************
+REM ******************** Prologue / Command Line Processing ********************
+REM ****************************************************************************
+
 SETLOCAL
+ECHO BUILD STARTED ON %DATE% AT %TIME% BY %USERDOMAIN%\%USERNAME%
 
 REM SET __ECHO=ECHO
 REM SET __ECHO2=ECHO
@@ -30,10 +35,9 @@ IF DEFINED DUMMY2 (
   GOTO usage
 )
 
-SET ROOT=%~dp0\..
-SET ROOT=%ROOT:\\=\%
+SET ARGS=%*
 
-%_VECHO% Root = '%ROOT%'
+%_VECHO% Args = '%ARGS%'
 
 SET CONFIGURATION=%1
 
@@ -67,17 +71,37 @@ IF DEFINED YEAR (
 
 %_VECHO% Year = '%YEAR%'
 
-SET BASE_CONFIGURATION=%CONFIGURATION%
-SET BASE_CONFIGURATION=%BASE_CONFIGURATION:ManagedOnly=%
-SET BASE_CONFIGURATION=%BASE_CONFIGURATION:NativeOnly=%
-SET BASE_CONFIGURATION=%BASE_CONFIGURATION:Static=%
+REM ****************************************************************************
+REM ********************** Set Miscellaneous Environment ***********************
+REM ****************************************************************************
 
-%_VECHO% BaseConfiguration = '%BASE_CONFIGURATION%'
+IF NOT DEFINED MSBUILD (
+  SET MSBUILD=MSBuild.exe
+)
+
+%_VECHO% MsBuild = '%MSBUILD%'
+
+IF NOT DEFINED DOTNET (
+  SET DOTNET=dotnet.exe
+)
+
+%_VECHO% DotNet = '%DOTNET%'
+
+IF NOT DEFINED CSC (
+  SET CSC=csc.exe
+)
+
+%_VECHO% Csc = '%CSC%'
 
 SET TOOLS=%~dp0
 SET TOOLS=%TOOLS:~0,-1%
 
 %_VECHO% Tools = '%TOOLS%'
+
+SET ROOT=%~dp0\..
+SET ROOT=%ROOT:\\=\%
+
+%_VECHO% Root = '%ROOT%'
 
 SET EXTERNALS=%ROOT%\Externals
 SET EXTERNALS=%EXTERNALS:\\=\%
@@ -91,6 +115,10 @@ IF NOT DEFINED VSWHERE_EXE (
 SET VSWHERE_EXE=%VSWHERE_EXE:\\=\%
 
 %_VECHO% VsWhereExe = '%VSWHERE_EXE%'
+
+REM ****************************************************************************
+REM ******************* Load Configuration / Platform / User *******************
+REM ****************************************************************************
 
 IF EXIST "%TOOLS%\set_%CONFIGURATION%_%PLATFORM%.bat" (
   CALL :fn_ResetErrorLevel
@@ -146,23 +174,22 @@ IF NOT DEFINED NOUSER (
   )
 )
 
-IF NOT DEFINED MSBUILD (
-  SET MSBUILD=MSBuild.exe
+REM ****************************************************************************
+REM ************************ Maximum CPU Count Handling ************************
+REM ****************************************************************************
+
+IF DEFINED MAXCPUCOUNT (
+  %_AECHO% Maximum CPU count option already defined.
+) ELSE (
+  IF DEFINED NOMAXCPUCOUNT (
+    %_AECHO% Maximum CPU count option use disabled.
+  ) ELSE (
+    %_AECHO% Maximum CPU count option not set, using default...
+    SET MAXCPUCOUNT=/maxCpuCount:1
+  )
 )
 
-%_VECHO% MsBuild = '%MSBUILD%'
-
-IF NOT DEFINED DOTNET (
-  SET DOTNET=dotnet.exe
-)
-
-%_VECHO% DotNet = '%DOTNET%'
-
-IF NOT DEFINED CSC (
-  SET CSC=csc.exe
-)
-
-%_VECHO% Csc = '%CSC%'
+%_VECHO% MaxCpuCount = '%MAXCPUCOUNT%'
 
 REM ****************************************************************************
 REM ********************* .NET Framework Version Overrides *********************
@@ -181,6 +208,9 @@ IF DEFINED NETCORE20ONLY (
       SET YEAR=NetStandard20
     )
   )
+  IF NOT DEFINED VCPRJEXT (
+    SET VCPRJEXT=.vcxproj
+  )
   CALL :fn_VerifyDotNetCore
   IF ERRORLEVEL 1 GOTO errors
   SET NOBUILDTOOLDIR=1
@@ -196,6 +226,9 @@ IF DEFINED NETCORE30ONLY (
     ) ELSE (
       SET YEAR=NetStandard21
     )
+  )
+  IF NOT DEFINED VCPRJEXT (
+    SET VCPRJEXT=.vcxproj
   )
   CALL :fn_VerifyDotNetCore
   IF ERRORLEVEL 1 GOTO errors
@@ -213,6 +246,9 @@ IF DEFINED NETFX20ONLY (
       SET YEAR=2005
     )
   )
+  IF NOT DEFINED VCPRJEXT (
+    SET VCPRJEXT=.vcproj
+  )
   CALL :fn_CheckFrameworkDir v2.0.50727
   GOTO setup_buildToolDir
 )
@@ -225,6 +261,9 @@ IF DEFINED NETFX35ONLY (
     ) ELSE (
       SET YEAR=2008
     )
+  )
+  IF NOT DEFINED VCPRJEXT (
+    SET VCPRJEXT=.vcproj
   )
   CALL :fn_CheckFrameworkDir v3.5
   GOTO setup_buildToolDir
@@ -239,6 +278,9 @@ IF DEFINED NETFX40ONLY (
       SET YEAR=2010
     )
   )
+  IF NOT DEFINED VCPRJEXT (
+    SET VCPRJEXT=.vcxproj
+  )
   CALL :fn_CheckFrameworkDir v4.0.30319
   GOTO setup_buildToolDir
 )
@@ -252,6 +294,9 @@ IF DEFINED NETFX45ONLY (
       SET YEAR=2012
     )
   )
+  IF NOT DEFINED VCPRJEXT (
+    SET VCPRJEXT=.vcxproj
+  )
   CALL :fn_CheckFrameworkDir v4.0.30319
   GOTO setup_buildToolDir
 )
@@ -264,6 +309,9 @@ IF DEFINED NETFX451ONLY (
     ) ELSE (
       SET YEAR=2013
     )
+  )
+  IF NOT DEFINED VCPRJEXT (
+    SET VCPRJEXT=.vcxproj
   )
   CALL :fn_CheckFrameworkDir v4.0.30319
   CALL :fn_CheckMsBuildDir 12.0
@@ -279,6 +327,9 @@ IF DEFINED NETFX452ONLY (
       SET YEAR=2013
     )
   )
+  IF NOT DEFINED VCPRJEXT (
+    SET VCPRJEXT=.vcxproj
+  )
   CALL :fn_CheckFrameworkDir v4.0.30319
   CALL :fn_CheckMsBuildDir 12.0
   GOTO setup_buildToolDir
@@ -292,6 +343,9 @@ IF DEFINED NETFX46ONLY (
     ) ELSE (
       SET YEAR=2015
     )
+  )
+  IF NOT DEFINED VCPRJEXT (
+    SET VCPRJEXT=.vcxproj
   )
   CALL :fn_CheckFrameworkDir v4.0.30319
   CALL :fn_CheckMsBuildDir 14.0
@@ -307,6 +361,9 @@ IF DEFINED NETFX461ONLY (
       SET YEAR=2015
     )
   )
+  IF NOT DEFINED VCPRJEXT (
+    SET VCPRJEXT=.vcxproj
+  )
   CALL :fn_CheckFrameworkDir v4.0.30319
   CALL :fn_CheckMsBuildDir 14.0
   GOTO setup_buildToolDir
@@ -321,6 +378,9 @@ IF DEFINED NETFX462ONLY (
       SET YEAR=2015
     )
   )
+  IF NOT DEFINED VCPRJEXT (
+    SET VCPRJEXT=.vcxproj
+  )
   CALL :fn_CheckFrameworkDir v4.0.30319
   CALL :fn_CheckMsBuildDir 14.0
   GOTO setup_buildToolDir
@@ -334,6 +394,9 @@ IF DEFINED NETFX47ONLY (
     ) ELSE (
       SET YEAR=2017
     )
+  )
+  IF NOT DEFINED VCPRJEXT (
+    SET VCPRJEXT=.vcxproj
   )
   IF NOT DEFINED NOUSEPACKAGERESTORE (
     IF NOT DEFINED USEPACKAGERESTORE (
@@ -355,6 +418,9 @@ IF DEFINED NETFX471ONLY (
       SET YEAR=2017
     )
   )
+  IF NOT DEFINED VCPRJEXT (
+    SET VCPRJEXT=.vcxproj
+  )
   IF NOT DEFINED NOUSEPACKAGERESTORE (
     IF NOT DEFINED USEPACKAGERESTORE (
       SET USEPACKAGERESTORE=1
@@ -374,6 +440,9 @@ IF DEFINED NETFX472ONLY (
     ) ELSE (
       SET YEAR=2017
     )
+  )
+  IF NOT DEFINED VCPRJEXT (
+    SET VCPRJEXT=.vcxproj
   )
   IF NOT DEFINED NOUSEPACKAGERESTORE (
     IF NOT DEFINED USEPACKAGERESTORE (
@@ -395,6 +464,9 @@ IF DEFINED NETFX48ONLY (
       SET YEAR=2017
     )
   )
+  IF NOT DEFINED VCPRJEXT (
+    SET VCPRJEXT=.vcxproj
+  )
   IF NOT DEFINED NOUSEPACKAGERESTORE (
     IF NOT DEFINED USEPACKAGERESTORE (
       SET USEPACKAGERESTORE=1
@@ -403,6 +475,29 @@ IF DEFINED NETFX48ONLY (
   CALL :fn_CheckFrameworkDir v4.0.30319
   CALL :fn_CheckMsBuildDir 14.0
   CALL :fn_CheckVisualStudioMsBuildDir Current 16.0
+  GOTO setup_buildToolDir
+)
+
+IF DEFINED NETFX481ONLY (
+  %_AECHO% Forcing the use of the .NET Framework 4.8.1...
+  IF NOT DEFINED YEAR (
+    IF DEFINED NETFX481YEAR (
+      SET YEAR=%NETFX481YEAR%
+    ) ELSE (
+      SET YEAR=2017
+    )
+  )
+  IF NOT DEFINED VCPRJEXT (
+    SET VCPRJEXT=.vcxproj
+  )
+  IF NOT DEFINED NOUSEPACKAGERESTORE (
+    IF NOT DEFINED USEPACKAGERESTORE (
+      SET USEPACKAGERESTORE=1
+    )
+  )
+  CALL :fn_CheckFrameworkDir v4.0.30319
+  CALL :fn_CheckMsBuildDir 14.0
+  CALL :fn_CheckVisualStudioMsBuildDir Current 17.0
   GOTO setup_buildToolDir
 )
 
@@ -460,27 +555,62 @@ IF ERRORLEVEL 1 (
 )
 
 REM ****************************************************************************
+REM *************************** Tcl Library Handling ***************************
+REM ****************************************************************************
+
+REM
+REM NOTE: Make sure Eagle can find the script library even when being built
+REM       with an arbitrary configuration suffix.
+REM
+SET TCL_LIBRARY=%ROOT%\Externals\Eagle\lib\Eagle1.0
+SET TCL_LIBRARY=%TCL_LIBRARY:\\=\%
+SET TCL_LIBRARY=%TCL_LIBRARY:\=/%
+
+%_VECHO% TclLibrary = '%TCL_LIBRARY%'
+
+REM ****************************************************************************
+REM ************************** Configuration Handling **************************
+REM ****************************************************************************
+
+CALL :fn_CopyVariable CONFIGURATION BASE_CONFIGURATION
+CALL :fn_CopyVariable CONFIGURATION EXTRA_CONFIGURATION
+
+SET BASE_CONFIGURATION=%BASE_CONFIGURATION:All=%
+SET BASE_CONFIGURATION=%BASE_CONFIGURATION:Dll=%
+SET BASE_CONFIGURATION=%BASE_CONFIGURATION:ManagedOnly=%
+SET BASE_CONFIGURATION=%BASE_CONFIGURATION:NativeOnly=%
+SET BASE_CONFIGURATION=%BASE_CONFIGURATION:Static=%
+
+%_VECHO% Configuration = '%CONFIGURATION%'
+%_VECHO% BaseConfiguration = '%BASE_CONFIGURATION%'
+%_VECHO% ExtraConfiguration = '%EXTRA_CONFIGURATION%'
+
+REM ****************************************************************************
 REM **************************** Solution Handling *****************************
 REM ****************************************************************************
 
-IF DEFINED USEDOTNET IF DEFINED INTEROPONLY (
-  CALL :fn_ForceMsBuildForInteropProject
-)
-
-%_VECHO% Configuration = '%CONFIGURATION%'
-%_VECHO% Year = '%YEAR%'
-%_VECHO% InteropYear = '%INTEROPYEAR%'
-%_VECHO% NoBuildToolDir = '%NOBUILDTOOLDIR%'
-%_VECHO% UseDotNet = '%USEDOTNET%'
-%_VECHO% Solution = '%SOLUTION%'
-%_VECHO% CoreOnly = '%COREONLY%'
-%_VECHO% InteropOnly = '%INTEROPONLY%'
-%_VECHO% StaticOnly = '%STATICONLY%'
-%_VECHO% BuildFull = '%BUILD_FULL%'
-
 CALL :fn_SetupSolution
 
+IF DEFINED USEDOTNET IF DEFINED INTEROPONLY (
+  CALL :fn_ForceMsBuildForInteropProject
+  CALL :fn_SetupSolution
+)
+
+%_VECHO% Year = '%YEAR%'
+%_VECHO% InteropYear = '%INTEROPYEAR%'
+%_VECHO% VcPrjExt = '%VCPRJEXT%'
 %_VECHO% Solution = '%SOLUTION%'
+%_VECHO% ExtraSolution = '%EXTRA_SOLUTION%'
+%_VECHO% CoreOnly = '%COREONLY%'
+%_VECHO% ShellOnly = '%SHELLONLY%'
+%_VECHO% InteropOnly = '%INTEROPONLY%'
+%_VECHO% PackageOnly = '%PACKAGEONLY%'
+%_VECHO% UtilityOnly = '%UTILITYONLY%'
+%_VECHO% StaticOnly = '%STATICONLY%'
+%_VECHO% BuildFull = '%BUILD_FULL%'
+%_VECHO% NoCommercial = '%NOCOMMERCIAL%'
+%_VECHO% NoEnterprise = '%NOENTERPRISE%'
+%_VECHO% NoExtra = '%NOEXTRA%'
 
 IF NOT DEFINED SOLUTION (
   ECHO Solution file is not defined.
@@ -495,7 +625,11 @@ IF NOT EXIST "%SOLUTION%" (
 FOR /F %%E IN ('ECHO %SOLUTION%') DO (SET SOLUTIONEXT=%%~xE)
 CALL :fn_ResetErrorLevel
 
+FOR /F %%E IN ('ECHO %EXTRA_SOLUTION%') DO (SET EXTRA_SOLUTIONEXT=%%~xE)
+CALL :fn_ResetErrorLevel
+
 %_VECHO% SolutionExt = '%SOLUTIONEXT%'
+%_VECHO% ExtraSolutionExt = '%EXTRA_SOLUTIONEXT%'
 
 IF /I "%SOLUTIONEXT%" == ".csproj" (
   SET MSBUILD_CONFIGURATION=%BASE_CONFIGURATION%
@@ -516,6 +650,36 @@ IF DEFINED INTEROPONLY (
     GOTO errors
   )
 )
+
+REM ****************************************************************************
+REM ********************* Solution Configuration Handling **********************
+REM ****************************************************************************
+
+REM
+REM NOTE: When building a C++ project, automatically change the "Configuration"
+REM       property to be "DebugDll" or "ReleaseDll", if necessary.  This allows
+REM       this tool to be called for a C++ project with no build configuration
+REM       specified on the command line.  It also allows the build configuration
+REM       specified on the command line to be "DebugAll" or "ReleaseAll", which
+REM       are the ones used by the solution files when building all the managed
+REM       and native code projects.
+REM
+CALL :fn_SetupConfiguration
+CALL :fn_SetupExtraConfiguration
+
+%_VECHO% Configuration = '%CONFIGURATION%'
+%_VECHO% ExtraConfiguration = '%EXTRA_CONFIGURATION%'
+
+REM ****************************************************************************
+REM **************************** Platform Handling *****************************
+REM ****************************************************************************
+
+CALL :fn_SetupPlatform
+CALL :fn_SetupExtraPlatform
+
+%_VECHO% DefaultPlatform = '%DEFAULT_PLATFORM%'
+%_VECHO% Platform = '%PLATFORM%'
+%_VECHO% ExtraPlatform = '%EXTRA_PLATFORM%'
 
 REM ****************************************************************************
 REM ***************************** Target Handling ******************************
@@ -622,6 +786,7 @@ IF NOT DEFINED RESTORE_SUBCOMMANDS (
 %_VECHO% MsBuildArgs = '%MSBUILD_ARGS%'
 %_VECHO% MsBuildArgsCfg = '%MSBUILD_ARGS_CFG%'
 %_VECHO% RestoreSubCommands = '%RESTORE_SUBCOMMANDS%'
+%_VECHO% MaxCpuCount = '%MAXCPUCOUNT%'
 
 IF DEFINED USEPACKAGERESTORE (
   %_CECHO% "%DOTNET%" %RESTORE_SUBCOMMANDS% "%SOLUTION%"
@@ -631,11 +796,15 @@ IF DEFINED USEPACKAGERESTORE (
     ECHO Restore failed.
     GOTO errors
   )
+) ELSE (
+  CALL :fn_AppendVariable NUGET_ARGS " /property:ResolveNuGetPackages=false"
 )
 
+%_VECHO% NuGetArgs = '%NUGET_ARGS%'
+
 IF NOT DEFINED NOBUILD (
-  %_CECHO% "%MSBUILD%" %BUILD_SUBCOMMANDS% "%SOLUTION%" "/target:%TARGET%" "/property:Configuration=%MSBUILD_CONFIGURATION%" "/property:Platform=%PLATFORM%" %LOGGING% %BUILD_ARGS% %MSBUILD_ARGS% %MSBUILD_ARGS_CFG%
-  %__ECHO% "%MSBUILD%" %BUILD_SUBCOMMANDS% "%SOLUTION%" "/target:%TARGET%" "/property:Configuration=%MSBUILD_CONFIGURATION%" "/property:Platform=%PLATFORM%" %LOGGING% %BUILD_ARGS% %MSBUILD_ARGS% %MSBUILD_ARGS_CFG%
+  %_CECHO% "%MSBUILD%" %BUILD_SUBCOMMANDS% "%SOLUTION%" %MAXCPUCOUNT% "/target:%TARGET%" "/property:Configuration=%MSBUILD_CONFIGURATION%" "/property:Platform=%PLATFORM%" %NUGET_ARGS% %LOGGING% %BUILD_ARGS% %MSBUILD_ARGS% %MSBUILD_ARGS_CFG%
+  %__ECHO% "%MSBUILD%" %BUILD_SUBCOMMANDS% "%SOLUTION%" %MAXCPUCOUNT% "/target:%TARGET%" "/property:Configuration=%MSBUILD_CONFIGURATION%" "/property:Platform=%PLATFORM%" %NUGET_ARGS% %LOGGING% %BUILD_ARGS% %MSBUILD_ARGS% %MSBUILD_ARGS_CFG%
 
   IF ERRORLEVEL 1 (
     ECHO Build failed.
@@ -675,8 +844,7 @@ REM ****************************************************************************
   IF DEFINED NOFRAMEWORK64 (
     %_AECHO% Forced into using 32-bit version of MSBuild from Microsoft.NET...
     SET FRAMEWORKDIR1=%windir%\Microsoft.NET\Framework\%FRAMEWORKVER%
-    CALL :fn_VerifyFrameworkDir
-    GOTO :EOF
+    GOTO :sb_VerifyAndMaxCpuCount
   )
   IF NOT "%PROCESSOR_ARCHITECTURE%" == "x86" (
     %_AECHO% The operating system appears to be 64-bit.
@@ -685,8 +853,7 @@ REM ****************************************************************************
         IF EXIST "%windir%\Microsoft.NET\Framework64\%FRAMEWORKVER%\%CSC%" (
           %_AECHO% Using 64-bit version of MSBuild from Microsoft.NET...
           SET FRAMEWORKDIR1=%windir%\Microsoft.NET\Framework64\%FRAMEWORKVER%
-          CALL :fn_VerifyFrameworkDir
-          GOTO :EOF
+          GOTO :sb_VerifyAndMaxCpuCount
         ) ELSE (
           %_AECHO% Missing 64-bit version of "%CSC%".
         )
@@ -701,7 +868,27 @@ REM ****************************************************************************
   )
   %_AECHO% Using 32-bit version of MSBuild from Microsoft.NET...
   SET FRAMEWORKDIR1=%windir%\Microsoft.NET\Framework\%FRAMEWORKVER%
+  REM
+  REM NOTE: This is the target for the GOTO in above nested IF block.
+  REM       First, it verifies the .NET Framework directory and then
+  REM       determines if the "/maxCpuCount" command line option to
+  REM       MSBuild should be removed.
+  REM
+  :sb_VerifyAndMaxCpuCount
   CALL :fn_VerifyFrameworkDir
+  REM
+  REM HACK: If MSBuild in the .NET Framework directory was verified
+  REM       -AND- the .NET Framework version is 2.0, then we cannot
+  REM       use the "/maxCpuCount" command line option for MSBuild,
+  REM       because it was introduced in the version of MSBuild that
+  REM       shipped with the .NET Framework version 3.5.
+  REM
+  IF DEFINED FRAMEWORKDIR1 (
+    IF /I "%FRAMEWORKVER%" == "v2.0.50727" (
+      %_AECHO% Maximum CPU count option is unavailable.
+      CALL :fn_UnsetVariable MAXCPUCOUNT
+    )
+  )
   GOTO :EOF
 
 :fn_VerifyFrameworkDir
@@ -737,7 +924,7 @@ REM ****************************************************************************
     %_AECHO% Forced into using 32-bit version of MSBuild from Program Files...
     GOTO set_msbuild_x86
   )
-  IF "%PROCESSOR_ARCHITECTURE%" == "x86" GOTO set_msbuild_x86
+  IF /I "%PROCESSOR_ARCHITECTURE%" == "x86" GOTO set_msbuild_x86
   %_AECHO% The operating system appears to be 64-bit.
   %_AECHO% Using 32-bit version of MSBuild from Program Files...
   SET MSBUILDDIR=%ProgramFiles(x86)%\MSBuild\%MSBUILDVER%\bin
@@ -879,108 +1066,6 @@ REM ****************************************************************************
   )
   GOTO :EOF
 
-:fn_ForceMsBuildForInteropProject
-  %_AECHO% Forcing use of MSBuild for interop project...
-  SET CONFIGURATION=%CONFIGURATION:ManagedOnly=NativeOnly%
-  IF DEFINED INTEROPYEAR (
-    SET YEAR=%INTEROPYEAR%
-  ) ELSE (
-    REM TODO: Good default for Visual C++?
-    SET YEAR=2015
-  )
-  CALL :fn_UnsetVariable NOBUILDTOOLDIR
-  CALL :fn_UnsetVariable USEDOTNET
-  GOTO :EOF
-
-:fn_DetectVisualStudioDir
-  REM
-  REM TODO: When the next version of Visual Studio and/or
-  REM       MSBuild is released, this section may need
-  REM       updating.
-  REM
-  IF NOT DEFINED VISUALSTUDIOMSBUILDDIR (
-    CALL :fn_CheckVisualStudioMsBuildDir Current 16.0
-    IF DEFINED VISUALSTUDIOMSBUILDDIR (
-      IF NOT DEFINED YEAR (
-        SET YEAR=2017
-      )
-      IF NOT DEFINED NOUSEPACKAGERESTORE (
-        IF NOT DEFINED USEPACKAGERESTORE (
-          SET USEPACKAGERESTORE=1
-        )
-      )
-    )
-  )
-  IF NOT DEFINED VISUALSTUDIOMSBUILDDIR (
-    CALL :fn_CheckVisualStudioMsBuildDir 15.0 15.0
-    IF DEFINED VISUALSTUDIOMSBUILDDIR (
-      IF NOT DEFINED YEAR (
-        SET YEAR=2017
-      )
-      IF NOT DEFINED NOUSEPACKAGERESTORE (
-        IF NOT DEFINED USEPACKAGERESTORE (
-          SET USEPACKAGERESTORE=1
-        )
-      )
-    )
-  )
-  GOTO :EOF
-
-:fn_DetectMsBuildDir
-  REM
-  REM TODO: When the next version of MSBuild is released,
-  REM       this section may need updating.
-  REM
-  IF NOT DEFINED MSBUILDDIR (
-    CALL :fn_CheckMsBuildDir 14.0
-    IF DEFINED MSBUILDDIR (
-      IF NOT DEFINED YEAR (
-        SET YEAR=2015
-      )
-    )
-  )
-  IF NOT DEFINED MSBUILDDIR (
-    CALL :fn_CheckMsBuildDir 12.0
-    IF DEFINED MSBUILDDIR (
-      IF NOT DEFINED YEAR (
-        SET YEAR=2013
-      )
-    )
-  )
-  GOTO :EOF
-
-:fn_DetectFrameworkDir
-  REM
-  REM TODO: When the next version of Visual Studio and/or
-  REM       .NET Framework is released, this section may
-  REM       need updating.
-  REM
-  IF NOT DEFINED FRAMEWORKDIR1 (
-    CALL :fn_CheckFrameworkDir v4.0.30319
-    IF DEFINED FRAMEWORKDIR1 (
-      IF NOT DEFINED YEAR (
-        SET YEAR=2010
-      )
-    )
-  )
-  IF NOT DEFINED FRAMEWORKDIR1 (
-    CALL :fn_CheckFrameworkDir v3.5
-    IF DEFINED FRAMEWORKDIR1 (
-      IF NOT DEFINED YEAR (
-        SET YEAR=2008
-      )
-    )
-  )
-  IF NOT DEFINED FRAMEWORKDIR1 (
-    CALL :fn_CheckFrameworkDir v2.0.50727
-    IF DEFINED FRAMEWORKDIR1 (
-      IF NOT DEFINED YEAR (
-        SET YEAR=2005
-      )
-    )
-  )
-  GOTO :EOF
-
 :fn_SetupBuildTool
   %_AECHO% Setting up build tool...
   %_VECHO% NoBuildToolDir = '%NOBUILDTOOLDIR%'
@@ -1058,9 +1143,266 @@ REM ****************************************************************************
   SET SOLUTION=.\SQLite.NET.%YEAR%.MSBuild.sln
   GOTO :EOF
 
+:fn_ForceMsBuildForInteropProject
+  %_AECHO% Forcing use of MSBuild for interop project...
+  SET CONFIGURATION=%CONFIGURATION:ManagedOnly=NativeOnly%
+  IF DEFINED INTEROPYEAR (
+    SET YEAR=%INTEROPYEAR%
+  ) ELSE (
+    REM TODO: Good default for Visual C++?
+    SET YEAR=2015
+  )
+  IF NOT DEFINED VCPRJEXT (
+    SET VCPRJEXT=.vcxproj
+  )
+  CALL :fn_UnsetVariable NOBUILDTOOLDIR
+  CALL :fn_UnsetVariable USEDOTNET
+  GOTO :EOF
+
+:fn_DetectVisualStudioDir
+  REM
+  REM TODO: When the next version of Visual Studio and/or
+  REM       MSBuild is released, this section may need
+  REM       updating.
+  REM
+  IF NOT DEFINED VISUALSTUDIOMSBUILDDIR (
+    CALL :fn_CheckVisualStudioMsBuildDir Current 17.0
+    IF DEFINED VISUALSTUDIOMSBUILDDIR (
+      IF NOT DEFINED YEAR (
+        SET YEAR=2017
+      )
+      IF NOT DEFINED VCPRJEXT (
+        SET VCPRJEXT=.vcxproj
+      )
+      IF NOT DEFINED NOUSEPACKAGERESTORE (
+        IF NOT DEFINED USEPACKAGERESTORE (
+          SET USEPACKAGERESTORE=1
+        )
+      )
+    )
+  )
+  IF NOT DEFINED VISUALSTUDIOMSBUILDDIR (
+    CALL :fn_CheckVisualStudioMsBuildDir Current 16.0
+    IF DEFINED VISUALSTUDIOMSBUILDDIR (
+      IF NOT DEFINED YEAR (
+        SET YEAR=2017
+      )
+      IF NOT DEFINED VCPRJEXT (
+        SET VCPRJEXT=.vcxproj
+      )
+      IF NOT DEFINED NOUSEPACKAGERESTORE (
+        IF NOT DEFINED USEPACKAGERESTORE (
+          SET USEPACKAGERESTORE=1
+        )
+      )
+    )
+  )
+  IF NOT DEFINED VISUALSTUDIOMSBUILDDIR (
+    CALL :fn_CheckVisualStudioMsBuildDir 15.0 15.0
+    IF DEFINED VISUALSTUDIOMSBUILDDIR (
+      IF NOT DEFINED YEAR (
+        SET YEAR=2017
+      )
+      IF NOT DEFINED VCPRJEXT (
+        SET VCPRJEXT=.vcxproj
+      )
+      IF NOT DEFINED NOUSEPACKAGERESTORE (
+        IF NOT DEFINED USEPACKAGERESTORE (
+          SET USEPACKAGERESTORE=1
+        )
+      )
+    )
+  )
+  GOTO :EOF
+
+:fn_DetectMsBuildDir
+  REM
+  REM TODO: When the next version of MSBuild is released,
+  REM       this section may need updating.
+  REM
+  IF NOT DEFINED MSBUILDDIR (
+    CALL :fn_CheckMsBuildDir 14.0
+    IF DEFINED MSBUILDDIR (
+      IF NOT DEFINED YEAR (
+        SET YEAR=2015
+      )
+      IF NOT DEFINED VCPRJEXT (
+        SET VCPRJEXT=.vcxproj
+      )
+    )
+  )
+  IF NOT DEFINED MSBUILDDIR (
+    CALL :fn_CheckMsBuildDir 12.0
+    IF DEFINED MSBUILDDIR (
+      IF NOT DEFINED YEAR (
+        SET YEAR=2013
+      )
+      IF NOT DEFINED VCPRJEXT (
+        SET VCPRJEXT=.vcxproj
+      )
+    )
+  )
+  GOTO :EOF
+
+:fn_DetectFrameworkDir
+  REM
+  REM TODO: When the next version of Visual Studio and/or
+  REM       .NET Framework is released, this section may
+  REM       need updating.
+  REM
+  IF NOT DEFINED FRAMEWORKDIR1 (
+    CALL :fn_CheckFrameworkDir v4.0.30319
+    IF DEFINED FRAMEWORKDIR1 (
+      IF NOT DEFINED YEAR (
+        SET YEAR=2010
+      )
+      IF NOT DEFINED VCPRJEXT (
+        SET VCPRJEXT=.vcxproj
+      )
+    )
+  )
+  IF NOT DEFINED FRAMEWORKDIR1 (
+    CALL :fn_CheckFrameworkDir v3.5
+    IF DEFINED FRAMEWORKDIR1 (
+      IF NOT DEFINED YEAR (
+        SET YEAR=2008
+      )
+      IF NOT DEFINED VCPRJEXT (
+        SET VCPRJEXT=.vcproj
+      )
+    )
+  )
+  IF NOT DEFINED FRAMEWORKDIR1 (
+    CALL :fn_CheckFrameworkDir v2.0.50727
+    IF DEFINED FRAMEWORKDIR1 (
+      IF NOT DEFINED YEAR (
+        SET YEAR=2005
+      )
+      IF NOT DEFINED VCPRJEXT (
+        SET VCPRJEXT=.vcproj
+      )
+    )
+  )
+  GOTO :EOF
+
+:fn_SetupConfiguration
+  IF /I "%SOLUTIONEXT%" == ".vcproj" (
+    REM
+    REM NOTE: Visual C++ 200X project, allow the build configuration to be
+    REM       adjusted, if necessary.
+    REM
+  ) ELSE IF /I "%SOLUTIONEXT%" == ".vcxproj" (
+    REM
+    REM NOTE: Visual C++ 20XX project, allow the build configuration to be
+    REM       adjusted, if necessary.
+    REM
+  ) ELSE (
+    REM
+    REM NOTE: Adjusting the configuration should not be necessary.
+    REM
+    GOTO :EOF
+  )
+  IF /I "%CONFIGURATION%" == "Debug" (
+    SET CONFIGURATION=DebugDll
+  ) ELSE IF /I "%CONFIGURATION%" == "DebugAll" (
+    SET CONFIGURATION=DebugDll
+  ) ELSE IF /I "%CONFIGURATION%" == "Release" (
+    SET CONFIGURATION=ReleaseDll
+  ) ELSE IF /I "%CONFIGURATION%" == "ReleaseAll" (
+    SET CONFIGURATION=ReleaseDll
+  )
+  GOTO :EOF
+
+:fn_SetupExtraConfiguration
+  IF /I "%EXTRA_SOLUTIONEXT%" == ".vcproj" (
+    REM
+    REM NOTE: Visual C++ 200X project, allow the build configuration to be
+    REM       adjusted, if necessary.
+    REM
+  ) ELSE IF /I "%EXTRA_SOLUTIONEXT%" == ".vcxproj" (
+    REM
+    REM NOTE: Visual C++ 201X project, allow the build configuration to be
+    REM       adjusted, if necessary.
+    REM
+  ) ELSE (
+    REM
+    REM NOTE: Adjusting the configuration should not be necessary.
+    REM
+    GOTO :EOF
+  )
+  IF /I "%EXTRA_CONFIGURATION%" == "Debug" (
+    SET EXTRA_CONFIGURATION=DebugDll
+  ) ELSE IF /I "%EXTRA_CONFIGURATION%" == "DebugAll" (
+    SET EXTRA_CONFIGURATION=DebugDll
+  ) ELSE IF /I "%EXTRA_CONFIGURATION%" == "Release" (
+    SET EXTRA_CONFIGURATION=ReleaseDll
+  ) ELSE IF /I "%EXTRA_CONFIGURATION%" == "ReleaseAll" (
+    SET EXTRA_CONFIGURATION=ReleaseDll
+  )
+  GOTO :EOF
+
+:fn_SetupPlatform
+  IF NOT DEFINED DEFAULT_PLATFORM (
+    SET DEFAULT_PLATFORM=Win32
+  )
+  IF DEFINED PLATFORM (
+    CALL :fn_UnquoteVariable PLATFORM
+  ) ELSE (
+    REM
+    REM NOTE: It seems that MSBuild is very picky about the precise value of
+    REM       the "Platform" property.  When building a solution file, using
+    REM       a value of "Any CPU" is required.  When building a C# project,
+    REM       a value of "AnyCPU" is required.  When building a C++ project,
+    REM       a value of either "Win32" or "x64" is required.  Other values
+    REM       will most likely cause the build to fail.
+    REM
+    %_AECHO% No platform specified, using default...
+    IF /I "%SOLUTIONEXT%" == ".csproj" (
+      SET PLATFORM=AnyCPU
+    ) ELSE IF /I "%SOLUTIONEXT%" == ".vcproj" (
+      CALL :fn_CopyVariable DEFAULT_PLATFORM PLATFORM
+    ) ELSE IF /I "%SOLUTIONEXT%" == ".vcxproj" (
+      CALL :fn_CopyVariable DEFAULT_PLATFORM PLATFORM
+    ) ELSE (
+      SET PLATFORM=Any CPU
+    )
+  )
+  GOTO :EOF
+
+:fn_SetupExtraPlatform
+  IF NOT DEFINED DEFAULT_PLATFORM (
+    SET DEFAULT_PLATFORM=Win32
+  )
+  IF DEFINED EXTRA_PLATFORM (
+    CALL :fn_UnquoteVariable EXTRA_PLATFORM
+  ) ELSE (
+    REM
+    REM NOTE: It seems that MSBuild is very picky about the precise value of
+    REM       the "Platform" property.  When building a solution file, using
+    REM       a value of "Any CPU" is required.  When building a C# project,
+    REM       a value of "AnyCPU" is required.  When building a C++ project,
+    REM       a value of either "Win32" or "x64" is required.  Other values
+    REM       will most likely cause the build to fail.
+    REM
+    %_AECHO% No extra platform specified, using default...
+    IF /I "%EXTRA_SOLUTIONEXT%" == ".csproj" (
+      SET EXTRA_PLATFORM=AnyCPU
+    ) ELSE IF /I "%EXTRA_SOLUTIONEXT%" == ".vcproj" (
+      CALL :fn_CopyVariable DEFAULT_PLATFORM EXTRA_PLATFORM
+    ) ELSE IF /I "%EXTRA_SOLUTIONEXT%" == ".vcxproj" (
+      CALL :fn_CopyVariable DEFAULT_PLATFORM EXTRA_PLATFORM
+    ) ELSE (
+      SET EXTRA_PLATFORM=Any CPU
+    )
+  )
+  GOTO :EOF
+
 :fn_SetupTarget
   IF NOT DEFINED TARGET (
     SET TARGET=Rebuild
+  )
+  IF NOT DEFINED EXTRA_TARGET (
+    SET EXTRA_TARGET=Build
   )
   GOTO :EOF
 
@@ -1089,6 +1431,19 @@ REM ****************************************************************************
   IF DEFINED LOGGING GOTO :EOF
   IF DEFINED NOLOG GOTO :EOF
   SET LOGGING="/logger:FileLogger,%LOGASM%;Logfile=%LOGDIR%\%LOGPREFIX%_%CONFIGURATION%_%PLATFORM%_%YEAR%_%LOGSUFFIX%.log;Verbosity=diagnostic"
+  GOTO :EOF
+
+:fn_ReplaceAndUnquoteVariable
+  IF NOT DEFINED ComSpec GOTO :EOF
+  IF NOT DEFINED %1 GOTO :EOF
+  SETLOCAL
+  SET __ECHO_CMD=ECHO %%%1%%
+  FOR /F "delims=" %%V IN ('"%ComSpec%" /C %__ECHO_CMD%') DO (
+    SET VALUE=%%V
+  )
+  SET VALUE=%VALUE:"=%
+  REM "
+  ENDLOCAL && SET %1=%VALUE%
   GOTO :EOF
 
 :fn_UnquoteVariable
@@ -1124,6 +1479,19 @@ REM ****************************************************************************
     SET VALUE=%%V
   )
   ENDLOCAL && SET %2=%VALUE%
+  GOTO :EOF
+
+:fn_AppendVariable
+  SET __ECHO_CMD=ECHO %%%1%%
+  IF DEFINED %1 (
+    FOR /F "delims=" %%V IN ('%__ECHO_CMD%') DO (
+      SET %1=%%V%~2
+    )
+  ) ELSE (
+    SET %1=%~2
+  )
+  SET __ECHO_CMD=
+  CALL :fn_ResetErrorLevel
   GOTO :EOF
 
 :fn_UnsetVariable
@@ -1168,4 +1536,5 @@ REM ****************************************************************************
   GOTO end_of_file
 
 :end_of_file
+ECHO BUILD STOPPED ON %DATE% AT %TIME% BY %USERDOMAIN%\%USERNAME%
 %__ECHO% EXIT /B %ERRORLEVEL%

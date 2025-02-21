@@ -803,6 +803,11 @@ namespace System.Data.SQLite
       /// </summary>
       IoErr_CorruptFs = (IoErr | (33 << 8)),
       /// <summary>
+      /// An exception was caught during use of mapped memory.
+      /// In general, this applies only to the WAL journal mode.
+      /// </summary>
+      IoErr_In_Page = (IoErr | (34 << 8)),
+      /// <summary>
       /// A database table is locked in shared-cache mode.
       /// </summary>
       Locked_SharedCache = (Locked | (1 << 8)),

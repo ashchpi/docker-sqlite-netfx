@@ -1112,10 +1112,10 @@ namespace System.Data.SQLite
                         connectionPool2.Initialize(argument);
 
 #if !NET_COMPACT_20 && TRACE_CONNECTION
-                    Trace.WriteLine(HelperMethods.StringFormat(
+                    HelperMethods.Trace(HelperMethods.StringFormat(
                         CultureInfo.CurrentCulture,
                         "ConnectionPool: Initialized {0}",
-                        connectionPool));
+                        connectionPool), TraceCategory.Connection);
 #endif
 
                     _connectionPool = connectionPool;
@@ -1140,10 +1140,10 @@ namespace System.Data.SQLite
                         connectionPool2.Terminate(argument);
 
 #if !NET_COMPACT_20 && TRACE_CONNECTION
-                    Trace.WriteLine(HelperMethods.StringFormat(
+                    HelperMethods.Trace(HelperMethods.StringFormat(
                         CultureInfo.CurrentCulture,
                         "ConnectionPool: Terminated {0}",
-                        _connectionPool));
+                        _connectionPool), TraceCategory.Connection);
 #endif
 
                     _connectionPool = null;
@@ -1457,7 +1457,8 @@ namespace System.Data.SQLite
                 }
                 else
                 {
-                    handle.Close();
+                    if (handle != null)
+                        handle.Close();
                 }
 
                 GC.KeepAlive(handle);
@@ -2014,7 +2015,8 @@ namespace System.Data.SQLite
                 }
                 else
                 {
-                    handle.Close();
+                    if (handle != null)
+                        handle.Close();
                 }
             }
         }

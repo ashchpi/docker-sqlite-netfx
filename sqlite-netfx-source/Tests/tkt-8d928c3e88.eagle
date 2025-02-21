@@ -115,7 +115,7 @@ runTest {test tkt-8d928c3e88-2.1 {LINQ w/DateTimeFormat=Ticks} -body {
     lappend result [string trim $error]
   }
 
-  set result
+  set output
 } -cleanup {
   catch {info previouspid true}
 
@@ -151,7 +151,7 @@ runTest {test tkt-8d928c3e88-2.2 {LINQ w/DateTimeFormat=JulianDay} -body {
     lappend result [string trim $error]
   }
 
-  set result
+  set output
 } -cleanup {
   catch {info previouspid true}
 
@@ -186,7 +186,7 @@ runTest {test tkt-8d928c3e88-2.3 {LINQ w/DateTimeFormat=UnixEpoch} -body {
     lappend result [string trim $error]
   }
 
-  set result
+  set output
 } -cleanup {
   catch {info previouspid true}
 
@@ -221,7 +221,7 @@ runTest {test tkt-8d928c3e88-2.4 {LINQ w/DateTimeFormat=ISO8601} -body {
     lappend result [string trim $error]
   }
 
-  set result
+  set output
 } -cleanup {
   catch {info previouspid true}
 

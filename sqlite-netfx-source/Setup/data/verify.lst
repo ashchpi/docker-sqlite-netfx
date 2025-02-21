@@ -488,6 +488,14 @@ set sds_manifests(source) {
   SQLite.Interop/props/
   SQLite.Interop/props/empty.vsprops
   SQLite.Interop/props/include.vsprops
+  SQLite.Interop/props/Debug.props
+  SQLite.Interop/props/Debug.vsprops
+  SQLite.Interop/props/DebugNativeOnly.props
+  SQLite.Interop/props/DebugNativeOnly.vsprops
+  SQLite.Interop/props/Release.props
+  SQLite.Interop/props/Release.vsprops
+  SQLite.Interop/props/ReleaseNativeOnly.props
+  SQLite.Interop/props/ReleaseNativeOnly.vsprops
   SQLite.Interop/props/SQLite.Interop.2005.vsprops
   SQLite.Interop/props/SQLite.Interop.2008.vsprops
   SQLite.Interop/props/SQLite.Interop.2010.props
@@ -533,6 +541,7 @@ set sds_manifests(source) {
   SQLite.Interop/src/core/sqlite3.h
   SQLite.Interop/src/core/sqlite3ext.h
   SQLite.Interop/src/ext/
+  SQLite.Interop/src/ext/compress.c
   SQLite.Interop/src/ext/fts5.c
   SQLite.Interop/src/ext/percentile.c
   SQLite.Interop/src/ext/regexp.c
@@ -540,6 +549,7 @@ set sds_manifests(source) {
   SQLite.Interop/src/ext/shathree.c
   SQLite.Interop/src/ext/totype.c
   SQLite.Interop/src/ext/vtshim.c
+  SQLite.Interop/src/ext/zipfile.c
   SQLite.Interop/src/generic/
   SQLite.Interop/src/generic/interop.c
   SQLite.Interop/src/generic/interop.h
@@ -575,6 +585,7 @@ set sds_manifests(source) {
   System.Data.SQLite/Configurations/System.Data.SQLite.dll.config
   System.Data.SQLite/Generated/
   System.Data.SQLite/Generated/SR.resources
+  System.Data.SQLite/HelperMethods.cs
   System.Data.SQLite/ISQLiteNativeModule.cs
   System.Data.SQLite/LINQ/
   System.Data.SQLite/LINQ/SQLiteConnection_Linq.cs
@@ -845,7 +856,10 @@ set sds_manifests(source) {
   Tests/memory.eagle
   Tests/pool.eagle
   Tests/progress.eagle
+  Tests/pst-25cafb35e5.eagle
+  Tests/pst-3757f4365b.eagle
   Tests/pst-4db2934c2e.eagle
+  Tests/pst-76cb35b58d.eagle
   Tests/pst-eeaefb84ec.eagle
   Tests/pst-f4e718891d.eagle
   Tests/session.eagle
@@ -922,6 +936,7 @@ set sds_manifests(source) {
   Tests/tkt-b4a7ddc83f.eagle
   Tests/tkt-baf42ee135.eagle
   Tests/tkt-bb4b04d457.eagle
+  Tests/tkt-bbddfeb773.eagle
   Tests/tkt-c010fa6584.eagle
   Tests/tkt-c28d7fe915.eagle
   Tests/tkt-ccfa69fc32.eagle
@@ -1007,6 +1022,7 @@ set sds_manifests(eagle) {
   Externals/Eagle/lib/Eagle1.0/exec.eagle
   Externals/Eagle/lib/Eagle1.0/file1.eagle
   Externals/Eagle/lib/Eagle1.0/file2.eagle
+  Externals/Eagle/lib/Eagle1.0/file2u.eagle
   Externals/Eagle/lib/Eagle1.0/file3.eagle
   Externals/Eagle/lib/Eagle1.0/info.eagle
   Externals/Eagle/lib/Eagle1.0/init.eagle
@@ -1059,6 +1075,51 @@ set sds_manifests(external) {
   Externals/ResGen/ResGen.exe.config
   Externals/vswhere/
   Externals/vswhere/vswhere.exe
+  Externals/zlib/
+  Externals/zlib/include/
+  Externals/zlib/include/zconf.h
+  Externals/zlib/include/zlib.h
+  Externals/zlib/lib/
+  Externals/zlib/lib/200X/
+  Externals/zlib/lib/200X/Win32/
+  Externals/zlib/lib/200X/x64/
+  Externals/zlib/lib/200X/Win32/Debug/
+  Externals/zlib/lib/200X/Win32/Release/
+  Externals/zlib/lib/200X/Win32/Debug/zlib.lib
+  Externals/zlib/lib/200X/Win32/Release/zlib.lib
+  Externals/zlib/lib/200X/x64/Debug/
+  Externals/zlib/lib/200X/x64/Release/
+  Externals/zlib/lib/200X/x64/Debug/zlib.lib
+  Externals/zlib/lib/200X/x64/Release/zlib.lib
+  Externals/zlib/lib/200X_CE/
+  Externals/zlib/lib/200X_CE/Debug/
+  Externals/zlib/lib/200X_CE/Release/
+  Externals/zlib/lib/200X_CE/Debug/zlib.lib
+  Externals/zlib/lib/200X_CE/Release/zlib.lib
+  Externals/zlib/lib/201X/
+  Externals/zlib/lib/201X/Win32/
+  Externals/zlib/lib/201X/Win32/Debug/
+  Externals/zlib/lib/201X/Win32/Release/
+  Externals/zlib/lib/201X/Win32/Debug/zlib.lib
+  Externals/zlib/lib/201X/Win32/Release/zlib.lib
+  Externals/zlib/lib/201X/x64/
+  Externals/zlib/lib/201X/x64/Debug/
+  Externals/zlib/lib/201X/x64/Release/
+  Externals/zlib/lib/201X/x64/Debug/zlib.lib
+  Externals/zlib/lib/201X/x64/Release/zlib.lib
+  Externals/zlib/lib/201X_CE/
+  Externals/zlib/lib/201X_CE/ARMV7/
+  Externals/zlib/lib/201X_CE/ARMV7/Debug/
+  Externals/zlib/lib/201X_CE/ARMV7/Release/
+  Externals/zlib/lib/201X_CE/ARMV7/Debug/zlib.lib
+  Externals/zlib/lib/201X_CE/ARMV7/Release/zlib.lib
+  "Externals/zlib/lib/201X_CE/CEPC DevPlatform/"
+  "Externals/zlib/lib/201X_CE/CEPC DevPlatform/Debug/"
+  "Externals/zlib/lib/201X_CE/CEPC DevPlatform/Release/"
+  "Externals/zlib/lib/201X_CE/CEPC DevPlatform/Debug/zlib.lib"
+  "Externals/zlib/lib/201X_CE/CEPC DevPlatform/Release/zlib.lib"
+  Externals/zlib/src/
+  Externals/zlib/src/zlib-1.3.1.tar.gz
 }
 
 ###############################################################################

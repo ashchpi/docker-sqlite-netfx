@@ -329,10 +329,10 @@ namespace System.Data.SQLite
                 !theEvent.WaitOne(_initializeTimeout, false))
             {
 #if !NET_COMPACT_20
-                Trace.WriteLine(HelperMethods.StringFormat(
+                HelperMethods.Trace(HelperMethods.StringFormat(
                     CultureInfo.CurrentCulture,
                     "TIMED OUT ({0}) waiting for logging subsystem",
-                    _initializeTimeout));
+                    _initializeTimeout), TraceCategory.Log);
 #endif
             }
         }
@@ -965,15 +965,15 @@ namespace System.Data.SQLite
             if ((errorCode != null) &&
                 !Object.ReferenceEquals(errorCode, String.Empty))
             {
-                Trace.WriteLine(HelperMethods.StringFormat(
+                HelperMethods.Trace(HelperMethods.StringFormat(
                     CultureInfo.CurrentCulture, "SQLite {0} ({1}): {2}",
-                    type, errorCode, message));
+                    type, errorCode, message), TraceCategory.Log);
             }
             else
             {
-                Trace.WriteLine(HelperMethods.StringFormat(
+                HelperMethods.Trace(HelperMethods.StringFormat(
                     CultureInfo.CurrentCulture, "SQLite {0}: {1}",
-                    type, message));
+                    type, message), TraceCategory.Log);
             }
 #endif
         }

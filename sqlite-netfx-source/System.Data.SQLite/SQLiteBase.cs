@@ -143,6 +143,40 @@ namespace System.Data.SQLite
     /// <returns>Returns non-zero if the connection was actually closed (i.e. and not simply returned to a pool, etc).</returns>
     internal abstract bool Close(bool disposing);
     /// <summary>
+    /// Attempts to serialize the specified (or default)
+    /// <paramref name="schema" /> of the current database and
+    /// returns the resulting byte array.
+    /// </summary>
+    /// <param name="schema">
+    /// The name of the database schema (e.g. "main") to attempt to
+    /// serialize.  This parameter may be null.
+    /// </param>
+    /// <returns>
+    /// The raw database bytes, which may later be passed to the
+    /// <see cref="Deserialize" /> method.
+    /// </returns>
+    internal abstract byte[] Serialize(string schema);
+    /// <summary>
+    /// Attempts to deserialize into the specified (or default)
+    /// <paramref name="schema" /> of the current database, based
+    /// on the <paramref name="data" /> raw database bytes, and
+    /// then makes the resulting in-memory database accessible.
+    /// </summary>
+    /// <param name="schema">
+    /// The name of the schema to deserialize the raw database
+    /// bytes into.
+    /// </param>
+    /// <param name="data">
+    /// The raw database bytes.  This parameter must have been
+    /// obtained form the <see cref="Serialize" /> method -AND-
+    /// may not be null.
+    /// </param>
+    /// <param name="readOnly">
+    /// Non-zero if the resulting in-memory database should be
+    /// read-only.
+    /// </param>
+    internal abstract void Deserialize(string schema, byte[] data, bool readOnly);
+    /// <summary>
     /// Sets the busy timeout on the connection.  SQLiteCommand will call this before executing any command.
     /// </summary>
     /// <param name="nTimeoutMS">The number of milliseconds to wait before returning SQLITE_BUSY</param>
@@ -1142,9 +1176,6 @@ namespace System.Data.SQLite
     }
   }
 
-  /// <summary>
-  ///
-  /// </summary>
   public interface ISQLiteSchemaExtensions
   {
       /// <summary>
@@ -1154,6 +1185,22 @@ namespace System.Data.SQLite
       /// The connection upon which to build the schema tables.
       /// </param>
       void BuildTempSchema(SQLiteConnection connection);
+  }
+
+  [Flags]
+  internal enum SQLiteSerializeFlags
+  {
+      SQLITE_SERIALIZE_NONE = 0x0,  /* Use default handling. */
+      SQLITE_SERIALIZE_NOCOPY = 0x1 /* Do no memory allocations */
+  }
+
+  [Flags]
+  internal enum SQLiteDeserializeFlags
+  {
+      SQLITE_DESERIALIZE_NONE = 0x0,        /* Use default handling. */
+      SQLITE_DESERIALIZE_FREEONCLOSE = 0x1, /* Call sqlite3_free() on close. */
+      SQLITE_DESERIALIZE_RESIZEABLE = 0x2,  /* Resize using sqlite3_realloc64(). */
+      SQLITE_DESERIALIZE_READONLY = 0x4     /* Database is read-only. */
   }
 
   [Flags]
@@ -1557,6 +1604,26 @@ namespace System.Data.SQLite
       LogRetry = 0x8000000000000,
 
       /// <summary>
+      /// If a connection cannot be opened using the connection pool, throw
+      /// an exception instead of default behavior of falling back to using
+      /// a non-pooled connection.
+      /// </summary>
+      ConnectionPoolOnly = 0x10000000000000,
+
+      /// <summary>
+      /// Be more aggressive about disposing of unused native resources,
+      /// e.g. connections, transactions, commands, data readers, blobs,
+      /// etc.
+      ///
+      /// WARNING: This flag is enabled by default and should not be
+      ///          disabled unless there is a very good reason, e.g.
+      ///          an application that relies on the legacy disposal
+      ///          behavior.
+      ///
+      /// </summary>
+      AggressiveDisposal = 0x20000000000000,
+
+      /// <summary>
       /// When binding parameter values or returning column values, always
       /// treat them as though they were plain text (i.e. no numeric,
       /// date/time, or other conversions should be attempted).
@@ -1624,7 +1691,8 @@ namespace System.Data.SQLite
       /// <summary>
       /// The default extra flags for new connections.
       /// </summary>
-      Default = LogDefault | BindInvariantDecimal | GetInvariantDecimal,
+      Default = LogDefault | BindInvariantDecimal | GetInvariantDecimal |
+                AggressiveDisposal,
 
       /// <summary>
       /// The default extra flags for new connections with all logging enabled.
@@ -1974,7 +2042,8 @@ namespace System.Data.SQLite
     SQLITE_CONFIG_STMTJRNL_SPILL = 26, // int nByte
     SQLITE_CONFIG_SMALL_MALLOC = 27, // boolean
     SQLITE_CONFIG_SORTERREF_SIZE = 28, // int nByte
-    SQLITE_CONFIG_MEMDB_MAXSIZE = 29 // sqlite3_int64
+    SQLITE_CONFIG_MEMDB_MAXSIZE = 29, // sqlite3_int64
+    SQLITE_CONFIG_ROWID_IN_VIEW = 30 // int*
   }
 
   /// <summary>

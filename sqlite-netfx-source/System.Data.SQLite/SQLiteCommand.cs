@@ -172,9 +172,12 @@ namespace System.Data.SQLite
       if (transaction != null)
         Transaction = transaction;
 
-      SQLiteConnection.OnChanged(connection, new ConnectionEventArgs(
-          SQLiteConnectionEventType.NewCommand, null, transaction, this,
-          null, null, null, null));
+      if (SQLiteConnection.CanOnChanged(connection, false))
+      {
+          SQLiteConnection.OnChanged(connection, new ConnectionEventArgs(
+              SQLiteConnectionEventType.NewCommand, null, transaction, this,
+              null, null, null, null));
+      }
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -209,9 +212,12 @@ namespace System.Data.SQLite
     /// <param name="disposing">Whether or not the class is being explicitly or implicitly disposed</param>
     protected override void Dispose(bool disposing)
     {
-        SQLiteConnection.OnChanged(_cnn, new ConnectionEventArgs(
-            SQLiteConnectionEventType.DisposingCommand, null, _transaction, this,
-            null, null, null, new object[] { disposing, disposed }));
+        if (SQLiteConnection.CanOnChanged(_cnn, false))
+        {
+            SQLiteConnection.OnChanged(_cnn, new ConnectionEventArgs(
+                SQLiteConnectionEventType.DisposingCommand, null, _transaction, this,
+                null, null, null, new object[] { disposing, disposed }));
+        }
 
         bool skippedDispose = false;
 
@@ -225,8 +231,13 @@ namespace System.Data.SQLite
                     // dispose managed resources here...
                     ////////////////////////////////////
 
-                    // If a reader is active on this command, don't destroy the command, instead let the reader do it
+                    //
+                    // NOTE: If there is an active reader on
+                    //       us, let it perform the statement
+                    //       cleanup.
+                    //
                     SQLiteDataReader reader = null;
+
                     if (_activeReader != null)
                     {
                         try
@@ -235,12 +246,42 @@ namespace System.Data.SQLite
                         }
                         catch (InvalidOperationException)
                         {
+                            // do nothing.
                         }
                     }
 
                     if (reader != null)
                     {
                         reader._disposeCommand = true;
+
+                        if (HelperMethods.HasFlags(reader._flags,
+                                SQLiteConnectionFlags.AggressiveDisposal))
+                        {
+                            //
+                            // HACK: Copy the statement list to our active reader,
+                            //       after adding a reference to each one of the
+                            //       valid statements.
+                            //
+                            if (_statementList != null)
+                            {
+                                List<SQLiteStatement> statements =
+                                    new List<SQLiteStatement>();
+
+                                foreach (SQLiteStatement statement in _statementList)
+                                {
+                                    if (statement == null) continue;
+                                    statement.AddReference();
+                                    statements.Add(statement);
+                                }
+
+                                reader._statementList = statements;
+                            }
+                            else
+                            {
+                                reader._statementList = null;
+                            }
+                        }
+
                         _activeReader = null;
                         skippedDispose = true;
                         return;
@@ -405,9 +446,10 @@ namespace System.Data.SQLite
 #if !NET_COMPACT_20 && TRACE_WARNING
             else
             {
-                Trace.WriteLine(HelperMethods.StringFormat(CultureInfo.CurrentCulture,
+                HelperMethods.Trace(HelperMethods.StringFormat(
+                    CultureInfo.CurrentCulture,
                     "WARNING: Could not initialize global command behaviors: {0}",
-                    error));
+                    error), TraceCategory.Warning);
             }
 #endif
         }
@@ -417,42 +459,56 @@ namespace System.Data.SQLite
 
     private void DisposeStatements()
     {
-        if (_statementList == null) return;
+        DisposeStatements(true, ref _statementList);
+    }
 
-        int x = _statementList.Count;
+    ///////////////////////////////////////////////////////////////////////////////////////////////
 
-        for (int n = 0; n < x; n++)
+    internal static void DisposeStatements(
+        bool force,
+        ref List<SQLiteStatement> statements
+        )
+    {
+        if (statements == null) return;
+
+        int count = statements.Count;
+
+        for (int index = 0; index < count; index++)
         {
-            SQLiteStatement stmt = _statementList[n];
-            if (stmt == null) continue;
-            stmt.Dispose();
+            SQLiteStatement statement = statements[index];
+
+            if (statement == null) continue;
+
+            if ((statement.RemoveReference() <= 0) || force)
+                statement.Dispose();
         }
 
-        _statementList = null;
+        statements.Clear();
+        statements = null;
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
     private void ClearDataReader()
     {
-      if (_activeReader != null)
-      {
-        SQLiteDataReader reader = null;
-
-        try
+        if (_activeReader != null)
         {
-          reader = _activeReader.Target as SQLiteDataReader;
-        }
-        catch(InvalidOperationException)
-        {
-          // do nothing.
-        }
+            SQLiteDataReader reader = null;
 
-        if (reader != null)
-          reader.Close(); /* Dispose */
+            try
+            {
+                reader = _activeReader.Target as SQLiteDataReader;
+            }
+            catch (InvalidOperationException)
+            {
+                // do nothing.
+            }
 
-        _activeReader = null;
-      }
+            if (reader != null)
+                reader.Close(); /* Dispose */
+
+            _activeReader = null;
+        }
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -473,47 +529,57 @@ namespace System.Data.SQLite
     /// </summary>
     internal SQLiteStatement BuildNextCommand()
     {
-      SQLiteStatement stmt = null;
+        SQLiteStatement stmt = null;
 
-      try
-      {
-        if ((_cnn != null) && (_cnn._sql != null))
+        try
         {
-          if (_statementList == null)
-            _remainingText = _commandText;
+            if ((_cnn != null) && (_cnn._sql != null))
+            {
+                if (_statementList == null)
+                    _remainingText = _commandText;
 
-          stmt = _cnn._sql.Prepare(_cnn, this, _remainingText, (_statementList == null) ? null : _statementList[_statementList.Count - 1], (uint)(_commandTimeout * 1000), ref _remainingText);
+                stmt = _cnn._sql.Prepare(_cnn, this, _remainingText, (_statementList == null) ? null : _statementList[_statementList.Count - 1], (uint)(_commandTimeout * 1000), ref _remainingText);
 
-          if (stmt != null)
-          {
-            stmt._command = this;
+                if (stmt != null)
+                {
+                    stmt.AddReference();
+                    stmt._command = this;
 
-            if (_statementList == null)
-              _statementList = new List<SQLiteStatement>();
+                    if (_statementList == null)
+                        _statementList = new List<SQLiteStatement>();
 
-            _statementList.Add(stmt);
+                    _statementList.Add(stmt);
 
-            _parameterCollection.MapParameters(stmt);
-            stmt.BindParameters();
-          }
+                    _parameterCollection.MapParameters(stmt);
+                    stmt.BindParameters();
+                }
+            }
+            return stmt;
         }
-        return stmt;
-      }
-      catch (Exception)
-      {
-        if (stmt != null)
+        catch (Exception)
         {
-          if ((_statementList != null) && _statementList.Contains(stmt))
-            _statementList.Remove(stmt);
+            if (stmt != null)
+            {
+                if ((_statementList != null) &&
+                    _statementList.Contains(stmt))
+                {
+                    _statementList.Remove(stmt);
+                }
 
-          stmt.Dispose();
+                if ((stmt.RemoveReference() <= 0) ||
+                    !HelperMethods.HasFlags(
+                        SQLiteConnection.GetFlags(_cnn),
+                        SQLiteConnectionFlags.AggressiveDisposal))
+                {
+                    stmt.Dispose();
+                }
+            }
+
+            // If we threw an error compiling the statement, we cannot continue on so set the remaining text to null.
+            _remainingText = null;
+
+            throw;
         }
-
-        // If we threw an error compiling the statement, we cannot continue on so set the remaining text to null.
-        _remainingText = null;
-
-        throw;
-      }
     }
 
     internal SQLiteStatement GetStatement(int index)
@@ -522,7 +588,7 @@ namespace System.Data.SQLite
       if (_statementList == null) return BuildNextCommand();
 
       // If we're at the last built statement and want the next unbuilt statement, then build it
-      if (index == _statementList.Count)
+      if (index >= _statementList.Count)
       {
         if (String.IsNullOrEmpty(_remainingText) == false) return BuildNextCommand();
         else return null; // No more commands
@@ -569,13 +635,16 @@ namespace System.Data.SQLite
 
         string newCommandText = value;
 
-        ConnectionEventArgs previewEventArgs = new ConnectionEventArgs(
-            SQLiteConnectionEventType.SqlStringPreview,
-            null, null, null, null, null, null, null, null);
+        if (SQLiteConnection.CanOnChanged(_cnn, false))
+        {
+            ConnectionEventArgs previewEventArgs = new ConnectionEventArgs(
+                SQLiteConnectionEventType.SqlStringPreview,
+                null, null, null, null, null, null, null, null);
 
-        previewEventArgs.Result = newCommandText;
-        SQLiteConnection.OnChanged(_cnn, previewEventArgs);
-        newCommandText = previewEventArgs.Result;
+            previewEventArgs.Result = newCommandText;
+            SQLiteConnection.OnChanged(_cnn, previewEventArgs);
+            newCommandText = previewEventArgs.Result;
+        }
 
         if (_commandText == newCommandText) return;
 
@@ -691,18 +760,15 @@ namespace System.Data.SQLite
         if (_activeReader != null && _activeReader.IsAlive)
           throw new InvalidOperationException("Cannot set Connection while a DataReader is active");
 
-        if (_cnn != null)
-        {
-          ClearCommands();
-          //_cnn.RemoveCommand(this);
-        }
+        if (Object.ReferenceEquals(_cnn, value))
+          return;
+
+        ClearCommands();
 
         _cnn = value;
+
         if (_cnn != null)
           _version = _cnn._version;
-
-        //if (_cnn != null)
-        //  _cnn.AddCommand(this);
       }
     }
 
@@ -820,8 +886,8 @@ namespace System.Data.SQLite
             while ((text != null) && (text.Length > 0))
             {
                 currentStatement = sqlBase.Prepare(
-                    connection, this, text, previousStatement, timeout,
-                    ref text); /* throw */
+                    connection, this, text, previousStatement,
+                    timeout, ref text); /* throw */
 
                 previousStatement = currentStatement;
 

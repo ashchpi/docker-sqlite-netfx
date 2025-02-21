@@ -20,6 +20,10 @@ runSQLiteTestPrologue
 
 ###############################################################################
 
+catch {purgeAndCleanup $test_channel before}
+
+###############################################################################
+
 runTest {test tkt-ce4d70ea6f-1.1 {finalizer queue depth} -setup {
   set fileName tkt-ce4d70ea6f-1.1.db
 
@@ -87,6 +91,10 @@ runTest {test tkt-ce4d70ea6f-1.1 {finalizer queue depth} -setup {
 } -constraints [fixConstraints {fail.false eagle !mono !dotNetCore\
 command.object command.sql compile.DATA SQLite System.Data.SQLite\
 sdsTiming}] -match regexp -result {^\d+ 0 True$}}
+
+###############################################################################
+
+catch {purgeAndCleanup $test_channel after}
 
 ###############################################################################
 

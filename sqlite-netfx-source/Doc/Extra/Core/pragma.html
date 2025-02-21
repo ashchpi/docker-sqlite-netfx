@@ -159,8 +159,8 @@ built-in PRAGMA statements.</p>
 <hr /><a name="syntax"></a>
 <h2>PRAGMA command syntax</h2>
 <p><b><a href="syntax/pragma-stmt.html">pragma-stmt:</a></b>
-<button id='x2cdb322f' onclick='hideorshow("x2cdb322f","x877848b3")'>hide</button></p>
- <div id='x877848b3' class='imgcontainer'>
+<button id='x9d6dfba0' onclick='hideorshow("x9d6dfba0","x5f7c219f")'>hide</button></p>
+ <div id='x5f7c219f' class='imgcontainer'>
  <div style="max-width:824px"><svg xmlns='http://www.w3.org/2000/svg' class="pikchr" viewBox="0 0 824.352 99.576">
 <circle cx="5" cy="17" r="3.6"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
 <polygon points="32,17 20,21 20,12" style="fill:rgb(0,0,0)"/>
@@ -214,8 +214,8 @@ built-in PRAGMA statements.</p>
 </svg>
 </div>
 <p><b><a href="syntax/pragma-value.html">pragma-value:</a></b>
-<button id='xdf32955c' onclick='hideorshow("xdf32955c","x7296037a")'>hide</button></p>
- <div id='x7296037a' class='imgcontainer'>
+<button id='x87e7202d' onclick='hideorshow("x87e7202d","xf58fa64f")'>hide</button></p>
+ <div id='xf58fa64f' class='imgcontainer'>
  <div style="max-width:264px"><svg xmlns='http://www.w3.org/2000/svg' class="pikchr" viewBox="0 0 264.499 110.16">
 <circle cx="5" cy="17" r="3.6"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
 <polygon points="63,17 51,21 51,12" style="fill:rgb(0,0,0)"/>
@@ -242,8 +242,8 @@ built-in PRAGMA statements.</p>
 </svg>
 </div>
 <p><b><a href="syntax/signed-number.html">signed-number:</a></b>
-<button id='xc1b40d6a' onclick='hideorshow("xc1b40d6a","x2fe22c8d")'>show</button></p>
- <div id='x2fe22c8d' style='display:none;' class='imgcontainer'>
+<button id='x85c3fac1' onclick='hideorshow("x85c3fac1","xa5cbd52d")'>show</button></p>
+ <div id='xa5cbd52d' style='display:none;' class='imgcontainer'>
  <div style="max-width:292px"><svg xmlns='http://www.w3.org/2000/svg' class="pikchr" viewBox="0 0 292.013 99.576">
 <circle cx="5" cy="17" r="3.6"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
 <polygon points="50,44 39,48 39,40" style="fill:rgb(0,0,0)"/>
@@ -378,7 +378,7 @@ cannot use this feature.
 <li><a href='pragma.html#pragma_busy_timeout'>busy_timeout</a></li>
 <li><a href='pragma.html#pragma_cache_size'>cache_size</a></li>
 <li><a href='pragma.html#pragma_cache_spill'>cache_spill</a></li>
-<li><a href='pragma.html#pragma_case_sensitive_like'>case_sensitive_like</a></li>
+<li><a href='pragma.html#pragma_case_sensitive_like'><s>case_sensitive_like&sup1;</s></a></li>
 <li><a href='pragma.html#pragma_cell_size_check'>cell_size_check</a></li>
 <li><a href='pragma.html#pragma_checkpoint_fullfsync'>checkpoint_fullfsync</a></li>
 <li><a href='pragma.html#pragma_collation_list'>collation_list</a></li>
@@ -479,13 +479,19 @@ for use in application programs.</ol></p>
       on large databases.  The results of analysis are not as good
       when only part of each index is examined, but the results are
       usually good enough.  Setting N to 100 or 1000 allows the
-      ANALYZE command to run very quickly, even on multi-gigabyte
-      database files.  This pragma is particularly useful in combination
-      with <a href="pragma.html#pragma_optimize">PRAGMA optimize</a>.
+      ANALYZE command to run quickly, even on enormous
+      database files.
    <p>This pragma was added in SQLite version 3.32.0 (2020-05-22).
       The current implementation only uses the lower 31 bits of the
       N value - higher order bits are silently ignored.  Future versions
       of SQLite might begin using higher order bits.
+   <p>Beginning with SQLite version 3.46.0 (2024-05-23),
+      the recommended way of running <a href="lang_analyze.html">ANALYZE</a> is with the
+      <a href="pragma.html#pragma_optimize">PRAGMA optimize</a> command.  The <a href="pragma.html#pragma_optimize">PRAGMA optimize</a> will automatically
+      set a reasonable, temporary analysis limit that ensures that the
+      <a href="pragma.html#pragma_optimize">PRAGMA optimize</a> command will finish quickly even on enormous
+      databases.  Applications that use the <a href="pragma.html#pragma_optimize">PRAGMA optimize</a> instead of
+      running <a href="lang_analyze.html">ANALYZE</a> directly do not need to set an analysis limit.
 <a name="pragma_application_id"></a>
 <h _id=pragma_application_id style="display:none"> PRAGMA application_id</h><hr>
     <p><b>PRAGMA </b><i>schema.</i><b>application_id;
@@ -499,7 +505,7 @@ for use in application programs.</ol></p>
        <a href="http://www.darwinsys.com/file/">file(1)</a> can determine the specific
        file type rather than just reporting "SQLite3 Database".  A list of
        assigned application IDs can be seen by consulting the
-       <a href="http://www.sqlite.org/src/artifact?ci=trunk&filename=magic.txt">magic.txt</a> file in the SQLite source repository.
+       <a href="https://www.sqlite.org/src/artifact?ci=trunk&filename=magic.txt">magic.txt</a> file in the SQLite source repository.
 
 <p>   See also the <a href="pragma.html#pragma_user_version">user_version pragma</a>.
 <a name="pragma_auto_vacuum"></a>
@@ -671,6 +677,28 @@ for use in application programs.</ol></p>
     only changes the behavior of the SQL <a href="lang_expr.html#like">LIKE</a> operator.  It does not
     change the behavior of the <a href="c3ref/strlike.html">sqlite3_strlike()</a> C-language interface,
     which is always case insensitive.</p>
+
+    <p><b>WARNING:</b> If a database uses the LIKE operator anywhere in
+    the schema, such as in a <a href="lang_createtable.html#ckconst">CHECK constraint</a> or in an
+    <a href="expridx.html">expression index</a> or in the WHERE clause of a <a href="partialindex.html">partial index</a>, then
+    changing the definition of the LIKE operator using this PRAGMA can
+    cause the database to appear to be corrupt.  <a href="pragma.html#pragma_integrity_check">PRAGMA integrity_check</a>
+    will report errors.  The database is not really corrupt in that
+    changing the behavior of LIKE back to the way
+    it was when the schema was defined and the database was populated
+    will clear the problem.   If the use of LIKE occurs only in indexes,
+    then the problem can be cleared by running <a href="lang_reindex.html">REINDEX</a>.  Nevertheless, 
+    the use of the case_sensitive_like pragma is discouraged.</p>
+
+    
+    <p style='background-color: #ffd0d0;'>
+    <b>This pragma is deprecated</b> and exists
+    for backwards compatibility only.  New applications
+    should avoid using this pragma.  Older applications should discontinue
+    use of this pragma at the earliest opportunity.  This pragma may be omitted
+    from the build when SQLite is compiled using <a href="compile.html#omit_deprecated">SQLITE_OMIT_DEPRECATED</a>.
+    </p>
+  
 <a name="pragma_cell_size_check"></a>
 <h _id=pragma_cell_size_check style="display:none"> PRAGMA cell_size_check</h><hr>
     <p><b>PRAGMA cell_size_check
@@ -1459,74 +1487,93 @@ PRAGMA <b>main.</b>locking_mode=EXCLUSIVE;
   <p>Attempt to optimize the database.  All schemas are optimized in the 
   first two forms, and only the specified schema is optimized in the latter
   two.</p>
-  <p>To achieve the best long-term query performance without the need to
-  do a detailed engineering analysis of the application schema and SQL,
-  it is recommended that applications run "PRAGMA optimize" (with no arguments)
-  just before closing each <a href="c3ref/sqlite3.html">database connection</a>.  Long-running applications
-  might also benefit from setting a timer to run "PRAGMA optimize" every
-  few hours.
-  </p>
-  <p>This pragma is usually a no-op or nearly so and is very fast.
-  However if SQLite feels
-  that performing database optimizations (such as running <a href="lang_analyze.html">ANALYZE</a>
-  or creating new indexes) will improve the performance of future queries, then
-  some database I/O may be done.  Applications that want to limit the amount
-  of work performed can set a timer that will invoke
-  <a href="c3ref/interrupt.html">sqlite3_interrupt()</a> if the pragma goes on for too long.
-  Or, since SQLite 3.32.0, the application can use 
-  <a href="pragma.html#pragma_analysis_limit">PRAGMA analysis_limit=<i>N</i></a> for some small
-  value of <i>N</i> (a few hundred or a few thousand) to limit the depth
-  of analyze.
-  </p>
+  <p>In most applications, using PRAGMA optimize as follows will help
+  SQLite to achieve the best possible query performance:
+  <ol>
+  <li><p>
+  Applications with short-lived database connections should run
+  "PRAGMA optimize;" once, just prior to closing each database connection.
+
+  <li><p>
+  Applications that use long-lived database connections should run
+  "PRAGMA optimize=0x10002;" when the connection is first opened, and then
+  also run "PRAGMA optimize;" periodically, perhaps once per day or once
+  per hour.
+
+  <li><p>All applications should run "PRAGMA optimize;" after a schema change,
+  especially after one or more <a href="lang_createindex.html">CREATE INDEX</a> statements.
+  </ol>
+  <p>This pragma is usually a no-op or nearly so and is very fast.  On the
+  occasions where it does need to run ANALYZE on one or more tables, it
+  sets a temporary <a href="pragma.html#pragma_analysis_limit">analysis limit</a>, valid for the duration
+  of this pragma only, that prevents the ANALYZE invocations from running for
+  to long.</p>
+  <p>Recommended practice is that applications with short-lived database
+  connections should run "PRAGMA optimize" once when the database connection
+  closes.  Applications with long-lived database connections should run
+  "PRAGMA optimize=0x10002" when the database connection first opens, then
+  run "PRAGMA optimize" again at periodic intervals - perhaps once per day.
+  All applications should run "PRAGMA optimize" after schema changes, especially
+  <a href="lang_createindex.html">CREATE INDEX</a>. </p>
   <p>The details of optimizations performed by this pragma are expected
   to change and improve over time.  Applications should anticipate that
   this pragma will perform new optimizations in future releases.</p>
 
   <p>The optional MASK argument is a bitmask of optimizations to perform:
-  <ol>
-  <li value='1'><p>
-         Debugging mode.  Do not actually perform any optimizations
+
+  <table border=0 cellspacing=14 cellpadding=0>
+  <tr><td valign="top">0x00001
+      <td>Debugging mode.  Do not actually perform any optimizations
          but instead return one line of text for each optimization
          that would have been done.  Off by default.
-  <li value='2'><p>
-         Run <a href="lang_analyze.html">ANALYZE</a> on tables that might benefit.  On by default.
-         See below for additional information.
-  <li value='4'><p>
-         <em>(Not yet implemented)</em>
-         Record usage and performance 
-         information from the current session in the
-         database file so that it will be available to "optimize"
-         pragmas run by future database connections.
-  <li value='8'><p>
-         <em>(Not yet implemented)</em>
-         Create indexes that might have been helpful to recent queries.
-  </ol>
-  <p>The default MASK is and always shall be 0xfffe.  The 0xfffe mask means
-  perform all of the optimizations listed above except Debug Mode.  If new
-  optimizations are added in the future that should be off by default, those
-  new optimizations will be given a mask of 0x10000 or larger.</p>
+  <tr><td valign="top">0x00002
+      <td>Run <a href="lang_analyze.html">ANALYZE</a> on tables that might benefit.  On by default.</dd>
+  <tr><td valign="top">0x00010
+      <td>When running <a href="lang_analyze.html">ANALYZE</a>, set a temporary <a href="pragma.html#pragma_analysis_limit">PRAGMA analysis_limit</a> to
+         prevent excess run-time. On by default.
+  <tr><td valign="top">0x10000
+      <td>Check the size of all tables, not just tables that have not been
+         recently used, to see if any have grown and shrunk significantly
+         and hence might
+         benefit from being re-analyzed.  Off by default.
+  </table>
+  <p>The default MASK is 0xfffe.</p>
 
   <p>To see all optimizations that would have been done without actually
-  doing them, run "PRAGMA optimize(-1)".  To use only the ANALYZE
-  optimization, run "PRAGMA optimize(0x02)".</p>
+  doing them, run "PRAGMA optimize(-1)".</p>
   
   <p><b>Determination Of When To Run Analyze</b></p>
   <p> In the current implementation, a table is analyzed if and only if 
       all of the following are true:
-  <ul>
-  <li><p>
+  <ol>
+  <li>
     MASK bit 0x02 is set.
-  <li><p>
-    The query planner used <a href="fileformat2.html#stat1tab">sqlite_stat1</a>-style statistics for one or
-    more indexes of the table at some point during the lifetime of
-    the current connection.
-  <li><p>
-    One or more indexes of the table are currently unanalyzed <em>or</em>
-    the number of rows in the table has increased by 25 times or more
-    since the last time ANALYZE was run.
-  </ul>
+  <li>
+    The table is an ordinary table, not a view or virtual table.
+  <li>
+    The table name does not begin with "sqlite_".
+  <li>
+    One or more of the following are true:
+    <ol type="a">
+    <li> The 0x10000 bit of MASK is set
+    <li> One or more indexes on the table lack entries in the sqlite_stat1 table.
+    <li> The query planner used sqlite_stat1 statistics for one or more indexes
+         of this table at some point during the lifetime of the current database
+         connection.
+    </ol>
+  <li>
+    One or more of the following are true:
+    <ol type="a">
+    <li> One or more indexes on the table lack entries in the sqlite_stat1 table.
+    <li> The number of rows in the table has increased or decreased by 10-fold
+         since the last time ANALYZE was run on the table.
+    </ol>
+  </ol>
   <p> The rules for when tables are analyzed are likely to change in
-      future releases.
+      future releases.  New MASK values may be added in the future.  Future
+      versions of this pragma might accept a string literal argument instead
+      of a bit mask, though the bit mask argument will continue to be supported
+      for backwards compatibility.
 <a name="pragma_page_count"></a>
 <h _id=pragma_page_count style="display:none"> PRAGMA page_count</h><hr>
     <p><b>PRAGMA </b><i>schema.</i><b>page_count;</b></p>
@@ -2256,5 +2303,5 @@ PRAGMA <b>main.</b>locking_mode=EXCLUSIVE;
     a <a href="howtocorrupt.html#cfgerr">corrupt database file</a>.</span>
 
 <hr>
-<p align="center"><small><i>This page last modified on  <a href="https://sqlite.org/docsrc/honeypot" id="mtimelink"  data-href="https://sqlite.org/docsrc/finfo/pages/pragma.in?m=87e8125487">2023-02-16 21:36:11</a> UTC </small></i></p>
+<p align="center"><small><i>This page last modified on  <a href="https://sqlite.org/docsrc/honeypot" id="mtimelink"  data-href="https://sqlite.org/docsrc/finfo/pages/pragma.in?m=c5681f40cb">2024-04-16 16:29:07</a> UTC </small></i></p>
 

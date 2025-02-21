@@ -57,10 +57,12 @@ for {set i 1} {$i < 11} {incr i} {
             ::poolCounts(opened) ::poolCounts(closed)
 
         tputs $::test_channel [appendArgs \
-            "---- opened " $::poolCounts(opened) " connections from the pool\n"]
+            "---- opened " $::poolCounts(opened) \
+            " connections from the pool\n"]
 
         tputs $::test_channel [appendArgs \
-            "---- closed " $::poolCounts(closed) " connections to the pool\n"]
+            "---- closed " $::poolCounts(closed) \
+            " connections to the pool\n"]
       } else {
         set ::poolCounts(opened) 0
         set ::poolCounts(closed) 0

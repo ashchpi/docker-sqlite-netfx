@@ -193,11 +193,13 @@ namespace eval ::Eagle {
               #       not be added to the auto-path; however, all the package
               #       indexes and their associated packages will be available.
               #
+              set scanLibPath $::env(EAGLELIBPATH)
+
               if {!$quiet} then {
                 catch {
                   tqputs $channel [appendArgs \
                       "---- unable to forcibly refresh auto-path list, " \
-                      "scanning \"" $::env(EAGLELIBPATH) "\" instead...\n"]
+                      "scanning \"" $scanLibPath "\" instead...\n"]
                 }
               }
 
@@ -206,7 +208,16 @@ namespace eval ::Eagle {
               #       could fail, raising a script error here; however, that
               #       is highly unlikely.
               #
-              eval package scan -host -normal -refresh -- $::env(EAGLELIBPATH)
+              # HACK: Check for the "-primary" option to the [package scan]
+              #       sub-command here -AND- use it when available.
+              #
+              set command [list package scan -host -normal]
+
+              if {[catch {package scan -whatif -primary --}] == 0} then {
+                lappend command -primary
+              }
+
+              lappend command -refresh -- $scanLibPath; eval $command
             } else {
               if {!$quiet} then {
                 catch {

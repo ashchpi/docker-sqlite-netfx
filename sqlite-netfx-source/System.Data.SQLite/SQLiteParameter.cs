@@ -1,7 +1,7 @@
 /********************************************************
  * ADO.NET 2.0 Data Provider for SQLite Version 3.X
  * Written by Robert Simpson (robert@blackcastlesoft.com)
- * 
+ *
  * Released to the public domain, use at your own risk!
  ********************************************************/
 
@@ -11,6 +11,7 @@ namespace System.Data.SQLite
   using System.Data;
   using System.Data.Common;
   using System.ComponentModel;
+  using System.Globalization;
 
   /// <summary>
   /// SQLite implementation of DbParameter.
@@ -20,7 +21,7 @@ namespace System.Data.SQLite
     /// <summary>
     /// This value represents an "unknown" <see cref="DbType" />.
     /// </summary>
-    private const DbType UnknownDbType = (DbType)(-1);
+    public const DbType UnknownDbType = (DbType)(-1);
 
     /// <summary>
     /// The command associated with this parameter.
@@ -76,7 +77,7 @@ namespace System.Data.SQLite
     /// <summary>
     /// Default constructor
     /// </summary>
-    public SQLiteParameter() 
+    public SQLiteParameter()
       : this(null, UnknownDbType, 0, null, DataRowVersion.Current)
     {
     }
@@ -206,7 +207,7 @@ namespace System.Data.SQLite
     /// <param name="parameterSize">The size of the parameter</param>
     /// <param name="sourceColumn">The source column</param>
     /// <param name="rowVersion">The row version information</param>
-    public SQLiteParameter(string parameterName, DbType parameterType, int parameterSize, string sourceColumn, DataRowVersion rowVersion)      
+    public SQLiteParameter(string parameterName, DbType parameterType, int parameterSize, string sourceColumn, DataRowVersion rowVersion)
     {
       _parameterName = parameterName;
       _dbType = parameterType;
@@ -234,7 +235,7 @@ namespace System.Data.SQLite
     /// <param name="scale">Ignored</param>
     /// <param name="sourceColumn">The source column</param>
     /// <param name="rowVersion">The row version information</param>
-    /// <param name="value">The initial value to assign the parameter</param>   
+    /// <param name="value">The initial value to assign the parameter</param>
 #if !PLATFORM_COMPACTFRAMEWORK
     [EditorBrowsable(EditorBrowsableState.Advanced)]
 #endif
@@ -312,7 +313,7 @@ namespace System.Data.SQLite
       {
         return _command;
       }
-      set 
+      set
       {
         _command = value;
       }
@@ -327,7 +328,7 @@ namespace System.Data.SQLite
       {
         return _nullable;
       }
-      set 
+      set
       {
         _nullable = value;
       }
@@ -506,6 +507,65 @@ namespace System.Data.SQLite
       SQLiteParameter newparam = new SQLiteParameter(this);
 
       return newparam;
+    }
+
+    /// <summary>
+    /// Attempts to build a name suitable for use with an index-only
+    /// (unnamed) parameter.
+    /// </summary>
+    /// <param name="index">The index for the parameter.</param>
+    /// <param name="placeholder">
+    /// Non-zero if the returned name should be a placeholder, i.e.
+    /// an unnamed parameter that does not use a syntax supported by
+    /// the SQLite core library.
+    /// </param>
+    /// <returns>The built name -OR- null if it cannot be built.</returns>
+    internal static string CreateNameForIndex(int index, bool placeholder)
+    {
+        return HelperMethods.StringFormat(CultureInfo.InvariantCulture,
+            placeholder ? ";{0}" : "?{0}", index + 1);
+    }
+
+    /// <summary>
+    /// Returns non-zero if the specified parameter name appears to
+    /// refer to an unnamed parameter placeholder.
+    /// </summary>
+    /// <param name="name">
+    /// The parameter name to check.
+    /// </param>
+    /// <param name="index">
+    /// The parameter index or negative one if it cannot be determined.
+    /// </param>
+    /// <returns>
+    /// Non-zero if the specified parameter name represents an unnamed
+    /// placeholder parameter.
+    /// </returns>
+    internal static bool IsUnnamedPlaceholder(string name, out int index)
+    {
+        index = -1;
+
+        if (String.IsNullOrEmpty(name))
+            return false;
+
+        if (name[0] != ';')
+            return false;
+
+#if !PLATFORM_COMPACTFRAMEWORK
+        return int.TryParse(
+            name.Substring(1), NumberStyles.None, null, out index);
+#else
+        try
+        {
+            index = int.Parse(
+                name.Substring(1), NumberStyles.None, null);
+
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+#endif
     }
   }
 }

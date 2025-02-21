@@ -1,0 +1,167 @@
+###############################################################################
+#
+# pst-76cb35b58d.eagle --
+#
+# Written by Joe Mistachkin.
+# Released to the public domain, use at your own risk!
+#
+###############################################################################
+
+package require Eagle
+package require Eagle.Library
+package require Eagle.Test
+
+runTestPrologue
+
+###############################################################################
+
+package require System.Data.SQLite.Test
+runSQLiteTestPrologue
+
+###############################################################################
+
+runTest {test pst-76cb35b58d-1.1 {duplicate unnamed parameters} -setup {
+  setupDb [set fileName pst-76cb35b58d-1.1.db]
+} -body {
+  sql execute $db {
+    CREATE TABLE t1(x INTEGER, y TEXT, z TEXT, w TEXT);
+    INSERT INTO t1 (x, y) VALUES(1, 'one');
+    INSERT INTO t1 (x, y) VALUES(2, 'two');
+    INSERT INTO t1 (x, y) VALUES(3, 'three');
+  }
+
+  set param1 [list "" Int64 99]
+
+  sql execute $db "INSERT INTO t1 (x, y) VALUES(4, 'four');" $param1
+  sql execute $db "INSERT INTO t1 (x, y) VALUES(5, ?1);" $param1
+
+  set param1 [list "" Int64 6]
+
+  sql execute $db "INSERT INTO t1 (x, y) VALUES(?1, ?1);" $param1
+
+  set param1 [list "" Int64 7]
+  set param2 [list "" String "something else"]
+
+  sql execute $db \
+      "INSERT INTO t1 (x, y, z, w) VALUES(?1, ?1, ?2, ?2);" \
+      $param1 $param2
+
+  sql execute -execute reader -format list \
+      $db "SELECT x, y, z FROM t1 ORDER BY x;"
+} -cleanup {
+  cleanupDb $fileName
+
+  unset -nocomplain param1 param2
+  unset -nocomplain db fileName
+} -constraints {eagle monoBug28 command.sql compile.DATA SQLite\
+System.Data.SQLite} -result {1 one 2 two 3 three 4 four 5 99 6 6 7 7 {something\
+else}}}
+
+###############################################################################
+
+runTest {test pst-76cb35b58d-1.2 {duplicate unnamed parameters} -setup {
+  setupDb [set fileName pst-76cb35b58d-1.2.db]
+} -body {
+  sql execute $db {
+    CREATE TABLE t1(x INTEGER, y TEXT);
+    INSERT INTO t1 (x, y) VALUES(1, '1');
+    INSERT INTO t1 (x, y) VALUES(2, '2');
+    INSERT INTO t1 (x, y) VALUES(3, '3');
+    INSERT INTO t1 (x, y) VALUES(4, '4');
+  }
+
+  set sql(0) {
+    SELECT x, y FROM t1 WHERE x = 1 OR y = 1 ORDER BY x;
+  }
+
+  set sql(1) {
+    SELECT x, y FROM t1 WHERE x = ? OR y = ? ORDER BY x;
+  }
+
+  set sql(2) {
+    SELECT x, y FROM t1 WHERE x = ?1 OR y = ?1 ORDER BY x;
+  }
+
+  set sql(3) {
+    SELECT x, y FROM t1 WHERE x = ?1 OR y = ?2 ORDER BY x;
+  }
+
+  set sql(4) {
+    SELECT x, y FROM t1 WHERE x = ?2 OR y = ?1 ORDER BY x;
+  }
+
+  set sql(5) {
+    SELECT x, y FROM t1 WHERE x = ?2 OR y = ?2 ORDER BY x;
+  }
+
+  set result [list]
+  set param1 [list arg1 Int64 3]
+  set param2 [list arg2 Int64 4]
+
+  foreach name [lsort -integer [array names sql]] {
+    lappend result [sql execute -execute reader \
+        -format list $db $sql($name) $param1 $param2]
+  }
+
+  set result
+} -cleanup {
+  cleanupDb $fileName
+
+  unset -nocomplain sql name result param1 param2
+  unset -nocomplain db fileName
+} -constraints {eagle monoBug28 command.sql compile.DATA SQLite\
+System.Data.SQLite} -result {{1 1} {3 3 4 4} {3 3} {3 3 4 4} {3 3 4 4} {4 4}}}
+
+###############################################################################
+
+runTest {test pst-76cb35b58d-1.3 {unused named parameters} -setup {
+  setupDb [set fileName pst-76cb35b58d-1.3.db]
+} -body {
+  sql execute $db {
+    CREATE TABLE t1(x INTEGER, y TEXT, z TEXT);
+    INSERT INTO t1 (x, y, z) VALUES(1, '1', '0x1');
+    INSERT INTO t1 (x, y, z) VALUES(2, '2', '0x2');
+    INSERT INTO t1 (x, y, z) VALUES(3, '3', '0x3');
+    INSERT INTO t1 (x, y, z) VALUES(4, '4', '0x4');
+  }
+
+  set sql(0) {
+    SELECT x, y, z FROM t1 WHERE x = 1 OR y = 2 OR z = '0x3' ORDER BY x;
+  }
+
+  set sql(1) {
+    SELECT x, y, z FROM t1 WHERE x = :x OR y = 2 ORDER BY x;
+  }
+
+  set sql(2) {
+    SELECT x, y, z FROM t1 WHERE x = :x OR y = :y ORDER BY x;
+  }
+
+  set sql(3) {
+    SELECT x, y, z FROM t1 WHERE x = :x OR y = :y OR z = :z ORDER BY x;
+  }
+
+  set result [list]
+  set param1 [list :x Int64 1]
+  set param2 [list :y Int64 2]
+  set param3 [list :z String 0x3]
+
+  foreach name [lsort -integer [array names sql]] {
+    lappend result [sql execute -verbatim -execute reader \
+        -format list $db $sql($name) $param1 $param2 $param3]
+  }
+
+  set result
+} -cleanup {
+  cleanupDb $fileName
+
+  unset -nocomplain sql name result param1 param2 param3
+  unset -nocomplain db fileName
+} -constraints {eagle monoBug28 command.sql compile.DATA SQLite\
+System.Data.SQLite} -result {{1 1 0x1 2 2 0x2 3 3 0x3} {1 1 0x1 2 2 0x2} {1 1\
+0x1 2 2 0x2} {1 1 0x1 2 2 0x2 3 3 0x3}}}
+
+###############################################################################
+
+runSQLiteTestEpilogue
+runTestEpilogue

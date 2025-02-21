@@ -9,6 +9,7 @@ namespace System.Data.SQLite
 {
   using System;
   using System.Globalization;
+  using System.Threading;
 
   /// <summary>
   /// Represents a single SQL statement in SQLite.
@@ -69,6 +70,12 @@ namespace System.Data.SQLite
     private string[] _types;
 
     /// <summary>
+    /// The reference count for this statement, which may be shared between
+    /// a <see cref="SQLiteCommand" /> and a <see cref="SQLiteDataReader" />.
+    /// </summary>
+    private int _referenceCount;
+
+    /// <summary>
     /// Initializes the statement and attempts to get all information about parameters in the statement
     /// </summary>
     /// <param name="sqlbase">The base SQLite object</param>
@@ -106,7 +113,7 @@ namespace System.Data.SQLite
           s = _sql.Bind_ParamName(this, _flags, x + 1);
           if (String.IsNullOrEmpty(s))
           {
-            s = HelperMethods.StringFormat(CultureInfo.InvariantCulture, ";{0}", nCmdStart);
+            s = SQLiteParameter.CreateNameForIndex(nCmdStart, true);
             nCmdStart++;
             _unnamedParameters++;
           }
@@ -115,6 +122,22 @@ namespace System.Data.SQLite
         }
       }
     }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    #region Reference Count Members
+    internal int AddReference()
+    {
+        return Interlocked.Increment(ref _referenceCount);
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    internal int RemoveReference()
+    {
+        return Interlocked.Decrement(ref _referenceCount);
+    }
+    #endregion
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -217,12 +240,56 @@ namespace System.Data.SQLite
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
     /// <summary>
+    /// This method attempts to map the specified named placeholder
+    /// parameter, i.e. an unnamed parameter that has been given an
+    /// placeholder name.
+    /// </summary>
+    /// <param name="s">The placeholder parameter name to map.</param>
+    /// <param name="p">The parameter to assign it.</param>
+    /// <param name="noCase">Non-zero to ignore case.</param>
+    internal bool MapUnnamedParameter(string s, SQLiteParameter p, bool noCase)
+    {
+        if (_paramNames == null)
+            return false;
+
+        int index;
+
+        if (SQLiteParameter.IsUnnamedPlaceholder(s, out index))
+        {
+            StringComparison comparisonType = noCase ?
+                StringComparison.OrdinalIgnoreCase :
+                StringComparison.Ordinal;
+
+            s = String.Format("?{0}", index);
+
+            int length = s.Length;
+            int count = _paramNames.Length;
+
+            for (int n = 0; n < count; n++)
+            {
+                if (String.Compare(
+                      _paramNames[n], 0, s, 0, length,
+                      comparisonType) == 0)
+                {
+                    _paramValues[n] = p;
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    /// <summary>
     /// Called by SQLiteParameterCollection, this function determines if the specified parameter name belongs to
     /// this statement, and if so, keeps a reference to the parameter so it can be bound later.
     /// </summary>
     /// <param name="s">The parameter name to map</param>
     /// <param name="p">The parameter to assign it</param>
-    internal bool MapParameter(string s, SQLiteParameter p)
+    /// <param name="noCase">Non-zero to ignore case.</param>
+    internal bool MapParameter(string s, SQLiteParameter p, bool noCase)
     {
       if (_paramNames == null) return false;
 
@@ -233,10 +300,18 @@ namespace System.Data.SQLite
           startAt = 1;
       }
 
+      StringComparison comparisonType = noCase ?
+          StringComparison.OrdinalIgnoreCase :
+          StringComparison.Ordinal;
+
       int x = _paramNames.Length;
+
       for (int n = 0; n < x; n++)
       {
-        if (String.Compare(_paramNames[n], startAt, s, 0, Math.Max(_paramNames[n].Length - startAt, s.Length), StringComparison.Ordinal) == 0)
+        if (String.Compare(
+            _paramNames[n], startAt, s, 0, Math.Max(
+                _paramNames[n].Length - startAt,
+                s.Length), comparisonType) == 0)
         {
           _paramValues[n] = p;
           return true;

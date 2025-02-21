@@ -26,7 +26,7 @@ namespace System.Data.SQLite
     /// <summary>
     /// The flags pertaining to the associated connection (via the command).
     /// </summary>
-    private SQLiteConnectionFlags _flags;
+    internal SQLiteConnectionFlags _flags;
     /// <summary>
     /// Index of the current statement in the command being processed
     /// </summary>
@@ -76,6 +76,11 @@ namespace System.Data.SQLite
     internal bool _disposeCommand;
 
     /// <summary>
+    /// The SQL command text, broken into individual SQL statements as they are executed
+    /// </summary>
+    internal List<SQLiteStatement> _statementList;
+
+    /// <summary>
     /// If set, then raise an exception when the object is accessed after being disposed.
     /// </summary>
     internal bool _throwOnDisposed;
@@ -104,24 +109,59 @@ namespace System.Data.SQLite
     /// <param name="behave">The expected behavior of the data reader</param>
     internal SQLiteDataReader(SQLiteCommand cmd, CommandBehavior behave)
     {
+      ResetIterationState();
+
       _throwOnDisposed = true;
       _command = cmd;
       _version = _command.Connection._version;
       _baseSchemaName = _command.Connection._baseSchemaName;
 
       _commandBehavior = behave;
-      _activeStatementIndex = -1;
-      _rowsAffected = -1;
 
       RefreshFlags();
 
-      SQLiteConnection.OnChanged(GetConnection(this),
-          new ConnectionEventArgs(SQLiteConnectionEventType.NewDataReader,
-          null, null, _command, this, null, null, new object[] { behave }));
+      SQLiteConnection connection = GetConnection(this);
+
+      if (SQLiteConnection.CanOnChanged(connection, false))
+      {
+          SQLiteConnection.OnChanged(connection,
+              new ConnectionEventArgs(SQLiteConnectionEventType.NewDataReader,
+              null, null, _command, this, null, null, new object[] { behave }));
+      }
 
       if (_command != null)
           NextResult();
     }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    #region Private Methods
+    private void ResetIterationState()
+    {
+        _activeStatementIndex = -1;
+        _activeStatement = null;
+
+        _readingState = 0;
+        _rowsAffected = -1;
+        _fieldCount = 0;
+        _stepCount = 0;
+
+        _fieldIndexes = null;
+        _fieldTypeArray = null;
+
+        if (_keyInfo != null)
+        {
+            _keyInfo.Dispose();
+            _keyInfo = null;
+        }
+
+        if (_command != null)
+        {
+            _command.ResetDataReader();
+            _command = null;
+        }
+    }
+    #endregion
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -143,30 +183,43 @@ namespace System.Data.SQLite
     /// <param name="disposing"></param>
     protected override void Dispose(bool disposing)
     {
-        SQLiteConnection.OnChanged(GetConnection(this),
-            new ConnectionEventArgs(SQLiteConnectionEventType.DisposingDataReader,
-            null, null, _command, this, null, null, new object[] { disposing,
-            disposed, _commandBehavior, _readingState, _rowsAffected, _stepCount,
-            _fieldCount, _disposeCommand, _throwOnDisposed }));
+        SQLiteConnection connection = GetConnection(this);
+
+        if (SQLiteConnection.CanOnChanged(connection, false))
+        {
+            SQLiteConnection.OnChanged(connection,
+                new ConnectionEventArgs(SQLiteConnectionEventType.DisposingDataReader,
+                null, null, _command, this, null, null, new object[] { disposing,
+                disposed, _commandBehavior, _readingState, _rowsAffected, _stepCount,
+                _fieldCount, _disposeCommand, _throwOnDisposed }));
+        }
 
         try
         {
             if (!disposed)
             {
-                //if (disposing)
-                //{
-                //    ////////////////////////////////////
-                //    // dispose managed resources here...
-                //    ////////////////////////////////////
-                //}
+                if (disposing)
+                {
+                    ////////////////////////////////////
+                    // dispose managed resources here...
+                    ////////////////////////////////////
+
+                    if (HelperMethods.HasFlags(_flags,
+                            SQLiteConnectionFlags.AggressiveDisposal))
+                    {
+                        SQLiteCommand.DisposeStatements(
+                            false, ref _statementList);
+                    }
+                }
 
                 //////////////////////////////////////
                 // release unmanaged resources here...
                 //////////////////////////////////////
 
                 //
-                // NOTE: Fix for ticket [e1b2e0f769], do NOT throw exceptions
-                //       while we are being disposed.
+                // NOTE: Fix for ticket [e1b2e0f769],
+                //       do NOT throw exceptions while
+                //       we are being disposed.
                 //
                 _throwOnDisposed = false;
             }
@@ -195,64 +248,74 @@ namespace System.Data.SQLite
     /// </summary>
     public override void Close()
     {
-      CheckDisposed();
+        CheckDisposed();
 
-      SQLiteConnection.OnChanged(GetConnection(this),
-          new ConnectionEventArgs(SQLiteConnectionEventType.ClosingDataReader,
-          null, null, _command, this, null, null, new object[] { _commandBehavior,
-          _readingState, _rowsAffected, _stepCount, _fieldCount, _disposeCommand,
-          _throwOnDisposed }));
+        SQLiteConnection connection = GetConnection(this);
 
-      try
-      {
-        if (_command != null)
+        if (SQLiteConnection.CanOnChanged(connection, false))
         {
-          try
-          {
-            try
+            SQLiteConnection.OnChanged(connection,
+                new ConnectionEventArgs(SQLiteConnectionEventType.ClosingDataReader,
+                null, null, _command, this, null, null, new object[] { _commandBehavior,
+              _readingState, _rowsAffected, _stepCount, _fieldCount, _disposeCommand,
+              _throwOnDisposed }));
+        }
+
+        try
+        {
+            if (_command != null)
             {
-              // Make sure we've not been canceled
-              if (_version != 0)
-              {
                 try
                 {
-                  while (NextResult())
-                  {
-                  }
+                    try
+                    {
+                        // Make sure we've not been canceled
+                        if (_version != 0)
+                        {
+                            try
+                            {
+                                while (NextResult())
+                                {
+                                }
+                            }
+                            catch (SQLiteException)
+                            {
+                            }
+                        }
+                        _command.ResetDataReader();
+                    }
+                    finally
+                    {
+                        // If the datareader's behavior includes closing the connection,
+                        // then do so here.
+                        if ((_commandBehavior & CommandBehavior.CloseConnection) != 0 &&
+                            (_command.Connection != null))
+                        {
+                            _command.Connection.Close();
+                            _command.Connection = null;
+                        }
+                    }
                 }
-                catch(SQLiteException)
+                finally
                 {
+                    if (_disposeCommand)
+                        _command.Dispose();
                 }
-              }
-              _command.ResetDataReader();
             }
-            finally
-            {
-              // If the datareader's behavior includes closing the connection, then do so here.
-              if ((_commandBehavior & CommandBehavior.CloseConnection) != 0 && _command.Connection != null)
-                _command.Connection.Close();
-            }
-          }
-          finally
-          {
-            if (_disposeCommand)
-              _command.Dispose();
-          }
-        }
 
-        _command = null;
-        _activeStatement = null;
-        _fieldIndexes = null;
-        _fieldTypeArray = null;
-      }
-      finally
-      {
-        if (_keyInfo != null)
-        {
-          _keyInfo.Dispose();
-          _keyInfo = null;
+            _command = null;
+            _activeStatement = null;
+            _fieldIndexes = null;
+            _fieldTypeArray = null;
         }
-      }
+        finally
+        {
+            if (_keyInfo != null)
+            {
+                _keyInfo.Dispose();
+                _keyInfo = null;
+            }
+        }
     }
 
     /// <summary>
@@ -1920,6 +1983,7 @@ namespace System.Data.SQLite
       CheckClosed();
       if (_throwOnDisposed) SQLiteCommand.Check(_command);
 
+      SQLiteConnection connection = GetConnection(this);
       SQLiteStatement stmt = null;
       int fieldCount;
       bool schemaOnly = ((_commandBehavior & CommandBehavior.SchemaOnly) != 0);
@@ -1943,6 +2007,16 @@ namespace System.Data.SQLite
               if (!schemaOnly && Step(stmt)) { /* do nothing. */ }
               if (!schemaOnly) stmt._sql.Reset(stmt); // Gotta reset after every step to release any locks and such!
             }
+
+            if (SQLiteConnection.CanOnChanged(connection, false))
+            {
+                SQLiteConnection.OnChanged(
+                    connection, new ConnectionEventArgs(
+                    SQLiteConnectionEventType.DataReaderPreview,
+                    null, null, _command, this, null,
+                    "single result", false));
+            }
+
             return false;
           }
         }
@@ -1952,7 +2026,18 @@ namespace System.Data.SQLite
 
         // If we've reached the end of the statements, return false, no more resultsets
         if (stmt == null)
-          return false;
+        {
+            if (SQLiteConnection.CanOnChanged(connection, false))
+            {
+                SQLiteConnection.OnChanged(
+                    connection, new ConnectionEventArgs(
+                    SQLiteConnectionEventType.DataReaderPreview,
+                    null, null, _command, this, null,
+                    "end of statements", false));
+            }
+
+            return false;
+        }
 
         // If we were on a current resultset, set the state to "done reading" for it
         if (_readingState < 1)
@@ -1988,6 +2073,15 @@ namespace System.Data.SQLite
 
         if ((_commandBehavior & CommandBehavior.KeyInfo) != 0)
           LoadKeyInfo();
+
+        if (SQLiteConnection.CanOnChanged(connection, false))
+        {
+            SQLiteConnection.OnChanged(
+                connection, new ConnectionEventArgs(
+                SQLiteConnectionEventType.DataReaderPreview,
+                null, null, _command, this, null,
+                "row of data", true));
+        }
 
         return true;
       }

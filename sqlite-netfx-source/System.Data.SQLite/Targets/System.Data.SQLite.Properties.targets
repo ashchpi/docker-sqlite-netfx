@@ -281,10 +281,40 @@
 
   <!--
       NOTE: Enable support (in the managed assemblies) for encrypted databases
-            using the CryptoAPI based codec?
+            using the CryptoAPI-based (RC4) codec?
   -->
   <PropertyGroup Condition="'$(InteropCodec)' != 'false'">
     <DefineConstants>$(DefineConstants);INTEROP_CODEC</DefineConstants>
+  </PropertyGroup>
+
+  <!--
+      NOTE: Enable support (in the managed assemblies) for the compress extension?
+  -->
+  <PropertyGroup Condition="'$(InteropCompressExtension)' != 'false'">
+    <DefineConstants>$(DefineConstants);INTEROP_COMPRESS_EXTENSION</DefineConstants>
+  </PropertyGroup>
+
+  <!--
+      NOTE: Enable extra diagnostics from the custom built interop DLL (see the
+            "SQLite.NET.Settings.targets" file for more information)?
+  -->
+  <PropertyGroup Condition="'$(InteropDebug)' != 'false'">
+    <DefineConstants>$(DefineConstants);INTEROP_DEBUG</DefineConstants>
+  </PropertyGroup>
+
+  <!--
+      NOTE: Enable support (in the managed assemblies) for the custom extension
+            functions?
+  -->
+  <PropertyGroup Condition="'$(InteropExtensionFunctions)' != 'false'">
+    <DefineConstants>$(DefineConstants);INTEROP_EXTENSION_FUNCTIONS</DefineConstants>
+  </PropertyGroup>
+
+  <!--
+      NOTE: Enable support (in the managed assemblies) for the FTS5 extension?
+  -->
+  <PropertyGroup Condition="'$(InteropFts5Extension)' != 'false'">
+    <DefineConstants>$(DefineConstants);INTEROP_FTS5_EXTENSION</DefineConstants>
   </PropertyGroup>
 
   <!--
@@ -318,29 +348,6 @@
   -->
   <PropertyGroup Condition="'$(InteropIncludeExtra)' != 'false'">
     <DefineConstants>$(DefineConstants);INTEROP_INCLUDE_EXTRA</DefineConstants>
-  </PropertyGroup>
-
-  <!--
-      NOTE: Enable extra diagnostics from the custom built interop DLL (see the
-            "SQLite.NET.Settings.targets" file for more information)?
-  -->
-  <PropertyGroup Condition="'$(InteropDebug)' != 'false'">
-    <DefineConstants>$(DefineConstants);INTEROP_DEBUG</DefineConstants>
-  </PropertyGroup>
-
-  <!--
-      NOTE: Enable support (in the managed assemblies) for the custom extension
-            functions?
-  -->
-  <PropertyGroup Condition="'$(InteropExtensionFunctions)' != 'false'">
-    <DefineConstants>$(DefineConstants);INTEROP_EXTENSION_FUNCTIONS</DefineConstants>
-  </PropertyGroup>
-
-  <!--
-      NOTE: Enable support (in the managed assemblies) for the FTS5 extension?
-  -->
-  <PropertyGroup Condition="'$(InteropFts5Extension)' != 'false'">
-    <DefineConstants>$(DefineConstants);INTEROP_FTS5_EXTENSION</DefineConstants>
   </PropertyGroup>
 
   <!--
@@ -418,6 +425,13 @@
   -->
   <PropertyGroup Condition="'$(InteropVirtualTable)' != 'false'">
     <DefineConstants>$(DefineConstants);INTEROP_VIRTUAL_TABLE</DefineConstants>
+  </PropertyGroup>
+
+  <!--
+      NOTE: Enable support (in the managed assemblies) for the zipfile extension?
+  -->
+  <PropertyGroup Condition="'$(InteropZipfileExtension)' != 'false'">
+    <DefineConstants>$(DefineConstants);INTEROP_ZIPFILE_EXTENSION</DefineConstants>
   </PropertyGroup>
 
   <!--

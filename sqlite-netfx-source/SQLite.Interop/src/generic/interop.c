@@ -24,6 +24,10 @@
 #define SQLITE_MAX_ATTACHED 30
 #endif
 
+#if /* SQLITE_VERSION_NUMBER >= 3046000 && */ WINCE && defined(SQLITE_DEBUG) && !defined(HAVE_WINCE_ABORT)
+#define abort()
+#endif
+
 #if defined(INTEROP_INCLUDE_SEE)
 #include "../core/sqlite3-see.c"
 #else
@@ -139,11 +143,17 @@ static const char * const azInteropCompileOpt[] = {
 #ifdef INTEROP_CODEC
   "CODEC",
 #endif
+#ifdef INTEROP_COMPRESS_EXTENSION
+  "COMPRESS_EXTENSION",
+#endif
 #ifdef INTEROP_DEBUG
   "DEBUG=" CTIMEOPT_VAL(INTEROP_DEBUG),
 #endif
 #ifdef INTEROP_EXTENSION_FUNCTIONS
   "EXTENSION_FUNCTIONS",
+#endif
+#ifdef INTEROP_FTS5_EXTENSION
+  "FTS5_EXTENSION",
 #endif
 #ifdef INTEROP_INCLUDE_CEROD
   "INCLUDE_CEROD",
@@ -186,6 +196,9 @@ static const char * const azInteropCompileOpt[] = {
 #endif
 #ifdef INTEROP_TOTYPE_EXTENSION
   "TOTYPE_EXTENSION",
+#endif
+#ifdef INTEROP_ZIPFILE_EXTENSION
+  "ZIPFILE_EXTENSION",
 #endif
 #ifdef SQLITE_VERSION_NUMBER
   "VERSION_NUMBER=" CTIMEOPT_VAL(SQLITE_VERSION_NUMBER),
@@ -1272,6 +1285,10 @@ SQLITE_API int WINAPI sqlite3_cursor_rowid_interop(sqlite3_stmt *pstmt, int curs
 #include "../ext/vtshim.c"
 #endif
 
+#if defined(INTEROP_COMPRESS_EXTENSION) && !defined(WINCE)
+#include "../ext/compress.c"
+#endif
+
 #if defined(INTEROP_FTS5_EXTENSION)
 #include "../ext/fts5.c"
 #endif
@@ -1294,6 +1311,13 @@ SQLITE_API int WINAPI sqlite3_cursor_rowid_interop(sqlite3_stmt *pstmt, int curs
 
 #if defined(INTEROP_TOTYPE_EXTENSION)
 #include "../ext/totype.c"
+#endif
+
+#if defined(INTEROP_ZIPFILE_EXTENSION)
+#if defined(WINCE)
+#define Z_SOLO
+#endif
+#include "../ext/zipfile.c"
 #endif
 
 /*****************************************************************************/
